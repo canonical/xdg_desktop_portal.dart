@@ -1,0 +1,22 @@
+name: xdg_desktop_portal
+version: 0.1.0
+
+description:
+  A native Dart implementation of portals. This package
+  allows Dart applications to use portals available on the Linux desktop.
+
+homepage: https://github.com/canonical/xdg_desktop_portal.dart
+
+environment:
+  sdk: '>=2.15.0 <3.0.0'
+
+platforms:
+  linux:
+
+dependencies:
+  dbus: ^0.7.0
+
+dev_dependencies:
+  lints: ^2.0.0
+  test: ^1.16.8
+  test_cov: ^1.0.1
