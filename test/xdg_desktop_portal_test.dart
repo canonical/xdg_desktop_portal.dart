@@ -9,12 +9,42 @@ class MockPortalObject extends DBusObject {
 
   MockPortalObject(this.server)
       : super(DBusObjectPath('/org/freedesktop/portal/desktop'));
+
+  @override
+  Future<DBusMethodResponse> handleMethodCall(DBusMethodCall methodCall) async {
+    switch (methodCall.interface) {
+      case 'org.freedesktop.portal.Settings':
+        return handleSettingsMethodCall(methodCall.name, methodCall.values);
+      default:
+        return DBusMethodErrorResponse.unknownInterface();
+    }
+  }
+
+  Future<DBusMethodResponse> handleSettingsMethodCall(
+      String name, List<DBusValue> values) async {
+    switch (name) {
+      case 'Read':
+        var namespace = values[0].asString();
+        var key = values[1].asString();
+        var value = server.settingsValues['$namespace/$key'];
+        if (value == null) {
+          return DBusMethodErrorResponse(
+              'org.freedesktop.portal.Error.NotFound',
+              [DBusString('Requested setting not found')]);
+        }
+        return DBusMethodSuccessResponse([DBusVariant(value)]);
+      default:
+        return DBusMethodErrorResponse.unknownMethod();
+    }
+  }
 }
 
 class MockPortalServer extends DBusClient {
   late final MockPortalObject _root;
+  final Map<String, DBusValue> settingsValues;
 
-  MockPortalServer(DBusAddress clientAddress) : super(clientAddress) {
+  MockPortalServer(DBusAddress clientAddress, {this.settingsValues = const {}})
+      : super(clientAddress) {
     _root = MockPortalObject(this);
   }
 
@@ -25,7 +55,7 @@ class MockPortalServer extends DBusClient {
 }
 
 void main() {
-  test('FIXME', () async {
+  test('settings read', () async {
     var server = DBusServer();
     var clientAddress =
         await server.listenAddress(DBusAddress.unix(dir: Directory.systemTemp));
@@ -33,7 +63,8 @@ void main() {
       await server.close();
     });
 
-    var portalServer = MockPortalServer(clientAddress);
+    var portalServer = MockPortalServer(clientAddress,
+        settingsValues: {'com.example.test/name': DBusString('Fred')});
     await portalServer.start();
     addTearDown(() async {
       await portalServer.close();
@@ -43,5 +74,8 @@ void main() {
     addTearDown(() async {
       await client.close();
     });
+
+    expect(await client.settings.read('com.example.test', 'name'),
+        equals(DBusString('Fred')));
   });
 }
