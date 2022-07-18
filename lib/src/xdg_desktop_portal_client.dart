@@ -15,6 +15,17 @@ class XdgSettingsPortal {
         replySignature: DBusSignature('v'));
     return result.returnValues[0].asVariant();
   }
+
+  Future<Map<String, Map<String, DBusValue>>> readAll(
+      Iterable<String> namespaces) async {
+    var result = await client._object.callMethod(
+        'org.freedesktop.portal.Settings',
+        'ReadAll',
+        [DBusArray.string(namespaces)],
+        replySignature: DBusSignature('a{sa{sv}}'));
+    return result.returnValues[0].asDict().map(
+        (key, value) => MapEntry(key.asString(), value.asStringVariantDict()));
+  }
 }
 
 /// A client that connects to the portals.

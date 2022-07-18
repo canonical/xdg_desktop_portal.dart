@@ -25,14 +25,27 @@ class MockPortalObject extends DBusObject {
     switch (name) {
       case 'Read':
         var namespace = values[0].asString();
+        var namespaceValues = server.settingsValues[namespace] ?? {};
         var key = values[1].asString();
-        var value = server.settingsValues['$namespace/$key'];
+        var value = namespaceValues[key];
         if (value == null) {
           return DBusMethodErrorResponse(
               'org.freedesktop.portal.Error.NotFound',
               [DBusString('Requested setting not found')]);
         }
         return DBusMethodSuccessResponse([DBusVariant(value)]);
+      case 'ReadAll':
+        var namespaces = values[0].asStringArray();
+        var result = <DBusValue, DBusValue>{};
+        for (var namespace in namespaces) {
+          var settingsValues = server.settingsValues[namespace];
+          if (settingsValues != null) {
+            result[DBusString(namespace)] =
+                DBusDict.stringVariant(settingsValues);
+          }
+        }
+        return DBusMethodSuccessResponse(
+            [DBusDict(DBusSignature('s'), DBusSignature('a{sv}'), result)]);
       default:
         return DBusMethodErrorResponse.unknownMethod();
     }
@@ -41,7 +54,7 @@ class MockPortalObject extends DBusObject {
 
 class MockPortalServer extends DBusClient {
   late final MockPortalObject _root;
-  final Map<String, DBusValue> settingsValues;
+  final Map<String, Map<String, DBusValue>> settingsValues;
 
   MockPortalServer(DBusAddress clientAddress, {this.settingsValues = const {}})
       : super(clientAddress) {
@@ -63,8 +76,9 @@ void main() {
       await server.close();
     });
 
-    var portalServer = MockPortalServer(clientAddress,
-        settingsValues: {'com.example.test/name': DBusString('Fred')});
+    var portalServer = MockPortalServer(clientAddress, settingsValues: {
+      'com.example.test': {'name': DBusString('Fred')}
+    });
     await portalServer.start();
     addTearDown(() async {
       await portalServer.close();
@@ -77,5 +91,48 @@ void main() {
 
     expect(await client.settings.read('com.example.test', 'name'),
         equals(DBusString('Fred')));
+  });
+
+  test('settings read all', () async {
+    var server = DBusServer();
+    var clientAddress =
+        await server.listenAddress(DBusAddress.unix(dir: Directory.systemTemp));
+    addTearDown(() async {
+      await server.close();
+    });
+
+    var portalServer = MockPortalServer(clientAddress, settingsValues: {
+      'com.example.test1': {
+        'name': DBusString('Fred'),
+        'age': DBusUint32(42),
+        'colour': DBusString('red')
+      },
+      'com.example.test2': {'name': DBusString('Bob')},
+      'com.example.test3': {'name': DBusString('Alice'), 'age': DBusUint32(21)}
+    });
+    await portalServer.start();
+    addTearDown(() async {
+      await portalServer.close();
+    });
+
+    var client = XdgDesktopPortalClient(bus: DBusClient(clientAddress));
+    addTearDown(() async {
+      await client.close();
+    });
+
+    expect(
+        await client.settings
+            .readAll(['com.example.test1', 'com.example.test3']),
+        equals({
+          'com.example.test1': {
+            'name': DBusString('Fred'),
+            'age': DBusUint32(42),
+            'colour': DBusString('red')
+          },
+          'com.example.test3': {
+            'name': DBusString('Alice'),
+            'age': DBusUint32(21)
+          }
+        }));
   });
 }
