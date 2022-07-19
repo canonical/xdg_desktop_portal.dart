@@ -115,6 +115,7 @@ void main() {
         title: 'Title',
         body: 'Lorem Ipsum',
         priority: XdgNotificationPriority.high,
+        defaultAction: 'action2',
         buttons: [
           XdgNotificationButton(label: 'Button 1', action: 'action1'),
           XdgNotificationButton(label: 'Button 2', action: 'action2')
@@ -126,6 +127,7 @@ void main() {
             'title': DBusString('Title'),
             'body': DBusString('Lorem Ipsum'),
             'priority': DBusString('high'),
+            'default-action': DBusString('action2'),
             'buttons': DBusArray(DBusSignature('a{sv}'), [
               DBusDict.stringVariant({
                 'label': DBusString('Button 1'),

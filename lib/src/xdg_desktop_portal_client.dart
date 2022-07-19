@@ -97,7 +97,7 @@ class XdgNotificationPortal {
           'normal');
     }
     if (defaultAction != null) {
-      notification['defaultAction'] = DBusString(defaultAction);
+      notification['default-action'] = DBusString(defaultAction);
     }
     if (buttons.isNotEmpty) {
       notification['buttons'] =
