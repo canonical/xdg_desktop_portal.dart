@@ -47,9 +47,9 @@ class MockPortalObject extends DBusObject {
       String name, List<DBusValue> values) async {
     switch (name) {
       case 'Lookup':
-        return DBusMethodSuccessResponse([
-          DBusArray.string(['direct://'])
-        ]);
+        var uri = values[0].asString();
+        var proxies = server.proxies[uri] ?? ['direct://'];
+        return DBusMethodSuccessResponse([DBusArray.string(proxies)]);
       default:
         return DBusMethodErrorResponse.unknownMethod();
     }
@@ -90,10 +90,12 @@ class MockPortalObject extends DBusObject {
 class MockPortalServer extends DBusClient {
   late final MockPortalObject _root;
   late final Map<String, Map<String, DBusValue>> notifications;
+  final Map<String, List<String>> proxies;
   final Map<String, Map<String, DBusValue>> settingsValues;
 
   MockPortalServer(DBusAddress clientAddress,
       {Map<String, Map<String, DBusValue>>? notifications,
+      this.proxies = const {},
       this.settingsValues = const {}})
       : super(clientAddress) {
     _root = MockPortalObject(this);
@@ -330,7 +332,9 @@ void main() {
       await server.close();
     });
 
-    var portalServer = MockPortalServer(clientAddress);
+    var portalServer = MockPortalServer(clientAddress, proxies: {
+      'http://example.com': ['http://localhost:1234']
+    });
     await portalServer.start();
     addTearDown(() async {
       await portalServer.close();
@@ -342,7 +346,7 @@ void main() {
     });
 
     expect(await client.proxyResolver.lookup('http://example.com'),
-        equals(['direct://']));
+        equals(['http://localhost:1234']));
   });
 
   test('settings read', () async {
