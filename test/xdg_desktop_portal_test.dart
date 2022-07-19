@@ -13,10 +13,29 @@ class MockPortalObject extends DBusObject {
   @override
   Future<DBusMethodResponse> handleMethodCall(DBusMethodCall methodCall) async {
     switch (methodCall.interface) {
+      case 'org.freedesktop.portal.Notification':
+        return handleNotificationMethodCall(methodCall.name, methodCall.values);
       case 'org.freedesktop.portal.Settings':
         return handleSettingsMethodCall(methodCall.name, methodCall.values);
       default:
         return DBusMethodErrorResponse.unknownInterface();
+    }
+  }
+
+  Future<DBusMethodResponse> handleNotificationMethodCall(
+      String name, List<DBusValue> values) async {
+    switch (name) {
+      case 'AddNotification':
+        var id = values[0].asString();
+        var notification = values[1].asStringVariantDict();
+        server.notifications[id] = notification;
+        return DBusMethodSuccessResponse();
+      case 'RemoveNotification':
+        var id = values[0].asString();
+        server.notifications.remove(id);
+        return DBusMethodSuccessResponse();
+      default:
+        return DBusMethodErrorResponse.unknownMethod();
     }
   }
 
@@ -54,11 +73,15 @@ class MockPortalObject extends DBusObject {
 
 class MockPortalServer extends DBusClient {
   late final MockPortalObject _root;
+  late final Map<String, Map<String, DBusValue>> notifications;
   final Map<String, Map<String, DBusValue>> settingsValues;
 
-  MockPortalServer(DBusAddress clientAddress, {this.settingsValues = const {}})
+  MockPortalServer(DBusAddress clientAddress,
+      {Map<String, Map<String, DBusValue>>? notifications,
+      this.settingsValues = const {}})
       : super(clientAddress) {
     _root = MockPortalObject(this);
+    this.notifications = notifications ?? {};
   }
 
   Future<void> start() async {
@@ -68,6 +91,64 @@ class MockPortalServer extends DBusClient {
 }
 
 void main() {
+  test('add notification', () async {
+    var server = DBusServer();
+    var clientAddress =
+        await server.listenAddress(DBusAddress.unix(dir: Directory.systemTemp));
+    addTearDown(() async {
+      await server.close();
+    });
+
+    var portalServer = MockPortalServer(clientAddress);
+    await portalServer.start();
+    addTearDown(() async {
+      await portalServer.close();
+    });
+
+    var client = XdgDesktopPortalClient(bus: DBusClient(clientAddress));
+    addTearDown(() async {
+      await client.close();
+    });
+
+    await client.notification.addNotification('123',
+        title: 'Title',
+        body: 'Lorem Ipsum',
+        priority: XdgNotificationPriority.high);
+    expect(
+        portalServer.notifications,
+        equals({
+          '123': {
+            'title': DBusString('Title'),
+            'body': DBusString('Lorem Ipsum'),
+            'priority': DBusString('high')
+          }
+        }));
+  });
+
+  test('add notification', () async {
+    var server = DBusServer();
+    var clientAddress =
+        await server.listenAddress(DBusAddress.unix(dir: Directory.systemTemp));
+    addTearDown(() async {
+      await server.close();
+    });
+
+    var portalServer = MockPortalServer(clientAddress,
+        notifications: {'122': {}, '123': {}, '124': {}});
+    await portalServer.start();
+    addTearDown(() async {
+      await portalServer.close();
+    });
+
+    var client = XdgDesktopPortalClient(bus: DBusClient(clientAddress));
+    addTearDown(() async {
+      await client.close();
+    });
+
+    await client.notification.removeNotification('123');
+    expect(portalServer.notifications, equals({'122': {}, '124': {}}));
+  });
+
   test('settings read', () async {
     var server = DBusServer();
     var clientAddress =
