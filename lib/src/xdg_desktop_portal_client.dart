@@ -123,6 +123,21 @@ class XdgNotificationPortal {
   }
 }
 
+/// Portal to use system proxy.
+class XdgProxyResolverPortal {
+  /// The client that is connected to this portal.
+  XdgDesktopPortalClient client;
+
+  XdgProxyResolverPortal(this.client);
+
+  Future<List<String>> lookup(String uri) async {
+    var result = await client._object.callMethod(
+        'org.freedesktop.portal.ProxyResolver', 'Lookup', [DBusString(uri)],
+        replySignature: DBusSignature('as'));
+    return result.returnValues[0].asStringArray().toList();
+  }
+}
+
 /// Portal to access system settings.
 class XdgSettingsPortal {
   /// The client that is connected to this portal.
@@ -162,6 +177,9 @@ class XdgDesktopPortalClient {
   /// Portal to create notifications.
   late final XdgNotificationPortal notification;
 
+  /// Portal to use system proxy.
+  late final XdgProxyResolverPortal proxyResolver;
+
   /// Portal to access system settings.
   late final XdgSettingsPortal settings;
 
@@ -173,6 +191,7 @@ class XdgDesktopPortalClient {
         name: 'org.freedesktop.portal.Desktop',
         path: DBusObjectPath('/org/freedesktop/portal/desktop'));
     notification = XdgNotificationPortal(this);
+    proxyResolver = XdgProxyResolverPortal(this);
     settings = XdgSettingsPortal(this);
   }
 

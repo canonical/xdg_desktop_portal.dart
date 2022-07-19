@@ -16,6 +16,9 @@ class MockPortalObject extends DBusObject {
     switch (methodCall.interface) {
       case 'org.freedesktop.portal.Notification':
         return handleNotificationMethodCall(methodCall.name, methodCall.values);
+      case 'org.freedesktop.portal.ProxyResolver':
+        return handleProxyResolverMethodCall(
+            methodCall.name, methodCall.values);
       case 'org.freedesktop.portal.Settings':
         return handleSettingsMethodCall(methodCall.name, methodCall.values);
       default:
@@ -35,6 +38,18 @@ class MockPortalObject extends DBusObject {
         var id = values[0].asString();
         server.notifications.remove(id);
         return DBusMethodSuccessResponse();
+      default:
+        return DBusMethodErrorResponse.unknownMethod();
+    }
+  }
+
+  Future<DBusMethodResponse> handleProxyResolverMethodCall(
+      String name, List<DBusValue> values) async {
+    switch (name) {
+      case 'Lookup':
+        return DBusMethodSuccessResponse([
+          DBusArray.string(['direct://'])
+        ]);
       default:
         return DBusMethodErrorResponse.unknownMethod();
     }
@@ -305,6 +320,29 @@ void main() {
 
     await client.notification.removeNotification('123');
     expect(portalServer.notifications, equals({'122': {}, '124': {}}));
+  });
+
+  test('proxy resolver', () async {
+    var server = DBusServer();
+    var clientAddress =
+        await server.listenAddress(DBusAddress.unix(dir: Directory.systemTemp));
+    addTearDown(() async {
+      await server.close();
+    });
+
+    var portalServer = MockPortalServer(clientAddress);
+    await portalServer.start();
+    addTearDown(() async {
+      await portalServer.close();
+    });
+
+    var client = XdgDesktopPortalClient(bus: DBusClient(clientAddress));
+    addTearDown(() async {
+      await client.close();
+    });
+
+    expect(await client.proxyResolver.lookup('http://example.com'),
+        equals(['direct://']));
   });
 
   test('settings read', () async {
