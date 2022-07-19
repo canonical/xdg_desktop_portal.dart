@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:dbus/dbus.dart';
 import 'package:test/test.dart';
@@ -113,19 +114,174 @@ void main() {
     await client.notification.addNotification('123',
         title: 'Title',
         body: 'Lorem Ipsum',
-        priority: XdgNotificationPriority.high);
+        priority: XdgNotificationPriority.high,
+        buttons: [
+          XdgNotificationButton(label: 'Button 1', action: 'action1'),
+          XdgNotificationButton(label: 'Button 2', action: 'action2')
+        ]);
     expect(
         portalServer.notifications,
         equals({
           '123': {
             'title': DBusString('Title'),
             'body': DBusString('Lorem Ipsum'),
-            'priority': DBusString('high')
+            'priority': DBusString('high'),
+            'buttons': DBusArray(DBusSignature('a{sv}'), [
+              DBusDict.stringVariant({
+                'label': DBusString('Button 1'),
+                'action': DBusString('action1')
+              }),
+              DBusDict.stringVariant({
+                'label': DBusString('Button 2'),
+                'action': DBusString('action2')
+              })
+            ])
           }
         }));
   });
 
-  test('add notification', () async {
+  test('add notification - icon file', () async {
+    var server = DBusServer();
+    var clientAddress =
+        await server.listenAddress(DBusAddress.unix(dir: Directory.systemTemp));
+    addTearDown(() async {
+      await server.close();
+    });
+
+    var portalServer = MockPortalServer(clientAddress);
+    await portalServer.start();
+    addTearDown(() async {
+      await portalServer.close();
+    });
+
+    var client = XdgDesktopPortalClient(bus: DBusClient(clientAddress));
+    addTearDown(() async {
+      await client.close();
+    });
+
+    await client.notification.addNotification('123',
+        title: 'Title',
+        icon: XdgNotificationIconFile('/usr/share/icons/icon.png'));
+    expect(
+        portalServer.notifications,
+        equals({
+          '123': {
+            'title': DBusString('Title'),
+            'icon': DBusStruct([
+              DBusString('file'),
+              DBusVariant(DBusString('/usr/share/icons/icon.png'))
+            ])
+          }
+        }));
+  });
+
+  test('add notification - icon uri', () async {
+    var server = DBusServer();
+    var clientAddress =
+        await server.listenAddress(DBusAddress.unix(dir: Directory.systemTemp));
+    addTearDown(() async {
+      await server.close();
+    });
+
+    var portalServer = MockPortalServer(clientAddress);
+    await portalServer.start();
+    addTearDown(() async {
+      await portalServer.close();
+    });
+
+    var client = XdgDesktopPortalClient(bus: DBusClient(clientAddress));
+    addTearDown(() async {
+      await client.close();
+    });
+
+    await client.notification.addNotification('123',
+        title: 'Title',
+        icon: XdgNotificationIconUri('https://example.com/icon.png'));
+    expect(
+        portalServer.notifications,
+        equals({
+          '123': {
+            'title': DBusString('Title'),
+            'icon': DBusStruct([
+              DBusString('file'),
+              DBusVariant(DBusString('https://example.com/icon.png'))
+            ])
+          }
+        }));
+  });
+
+  test('add notification - icon themed', () async {
+    var server = DBusServer();
+    var clientAddress =
+        await server.listenAddress(DBusAddress.unix(dir: Directory.systemTemp));
+    addTearDown(() async {
+      await server.close();
+    });
+
+    var portalServer = MockPortalServer(clientAddress);
+    await portalServer.start();
+    addTearDown(() async {
+      await portalServer.close();
+    });
+
+    var client = XdgDesktopPortalClient(bus: DBusClient(clientAddress));
+    addTearDown(() async {
+      await client.close();
+    });
+
+    await client.notification.addNotification('123',
+        title: 'Title', icon: XdgNotificationIconThemed(['name', 'fallback']));
+    expect(
+        portalServer.notifications,
+        equals({
+          '123': {
+            'title': DBusString('Title'),
+            'icon': DBusStruct([
+              DBusString('themed'),
+              DBusVariant(DBusArray.string(['name', 'fallback']))
+            ])
+          }
+        }));
+  });
+
+  test('add notification - icon data', () async {
+    var server = DBusServer();
+    var clientAddress =
+        await server.listenAddress(DBusAddress.unix(dir: Directory.systemTemp));
+    addTearDown(() async {
+      await server.close();
+    });
+
+    var portalServer = MockPortalServer(clientAddress);
+    await portalServer.start();
+    addTearDown(() async {
+      await portalServer.close();
+    });
+
+    var client = XdgDesktopPortalClient(bus: DBusClient(clientAddress));
+    addTearDown(() async {
+      await client.close();
+    });
+
+    await client.notification.addNotification('123',
+        title: 'Title',
+        icon: XdgNotificationIconData(Uint8List.fromList(
+            [0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef])));
+    expect(
+        portalServer.notifications,
+        equals({
+          '123': {
+            'title': DBusString('Title'),
+            'icon': DBusStruct([
+              DBusString('bytes'),
+              DBusVariant(DBusArray.byte(
+                  [0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef]))
+            ])
+          }
+        }));
+  });
+
+  test('remove notification', () async {
     var server = DBusServer();
     var clientAddress =
         await server.listenAddress(DBusAddress.unix(dir: Directory.systemTemp));

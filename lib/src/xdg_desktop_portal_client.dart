@@ -104,7 +104,7 @@ class XdgNotificationPortal {
           DBusArray(DBusSignature('a{sv}'), buttons.map((button) {
         var values = {
           'label': DBusString(button.label),
-          'actions': DBusString(button.action)
+          'action': DBusString(button.action)
         };
         return DBusDict.stringVariant(values);
       }));
