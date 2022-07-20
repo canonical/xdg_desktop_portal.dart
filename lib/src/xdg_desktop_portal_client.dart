@@ -2,6 +2,64 @@ import 'dart:async';
 import 'dart:typed_data';
 import 'package:dbus/dbus.dart';
 
+/// A request sent to a portal.
+class XdgPortalRequest {
+  /// The client that is connected to this portal.
+  XdgDesktopPortalClient client;
+
+  late final DBusRemoteObject _object;
+
+  XdgPortalRequest(this.client, DBusObjectPath path) {
+    _object =
+        DBusRemoteObject(client._bus, name: client._object.name, path: path);
+  }
+
+  Future<void> close() async {
+    await _object.callMethod('org.freedesktop.impl.portal.Request', 'Close', [],
+        replySignature: DBusSignature(''));
+  }
+}
+
+/// Portal to open URIs.
+class XdgOpenUriPortal {
+  /// The client that is connected to this portal.
+  XdgDesktopPortalClient client;
+
+  XdgOpenUriPortal(this.client);
+
+  /// Ask to open a URI.
+  Future<XdgPortalRequest> openUri(String uri,
+      {String parentWindow = '',
+      bool? writable,
+      bool? ask,
+      String? activationToken}) async {
+    var options = <String, DBusValue>{};
+    if (writable != null) {
+      options['writable'] = DBusBoolean(writable);
+    }
+    if (ask != null) {
+      options['ask'] = DBusBoolean(ask);
+    }
+    if (activationToken != null) {
+      options['activation_token'] = DBusString(activationToken);
+    }
+    var result = await client._object.callMethod(
+        'org.freedesktop.portal.OpenURI',
+        'OpenURI',
+        [
+          DBusString(parentWindow),
+          DBusString(uri),
+          DBusDict.stringVariant(options)
+        ],
+        replySignature: DBusSignature('o'));
+    return XdgPortalRequest(client, result.returnValues[0].asObjectPath());
+  }
+
+  // FIXME: OpenFile
+
+  // FIXME: OpenDirectory
+}
+
 /// Priorities for notifications.
 enum XdgNotificationPriority { low, normal, high, urgent }
 
@@ -177,6 +235,9 @@ class XdgDesktopPortalClient {
   /// Portal to create notifications.
   late final XdgNotificationPortal notification;
 
+  /// Portal to open URIs.
+  late final XdgOpenUriPortal openUri;
+
   /// Portal to use system proxy.
   late final XdgProxyResolverPortal proxyResolver;
 
@@ -191,6 +252,7 @@ class XdgDesktopPortalClient {
         name: 'org.freedesktop.portal.Desktop',
         path: DBusObjectPath('/org/freedesktop/portal/desktop'));
     notification = XdgNotificationPortal(this);
+    openUri = XdgOpenUriPortal(this);
     proxyResolver = XdgProxyResolverPortal(this);
     settings = XdgSettingsPortal(this);
   }

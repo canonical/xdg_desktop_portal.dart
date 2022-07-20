@@ -14,6 +14,7 @@ platforms:
   linux:
 
 dependencies:
+  collection: ^1.15.0
   dbus: ^0.7.0
 
 dev_dependencies:
