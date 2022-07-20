@@ -1,9 +1,56 @@
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:collection/collection.dart';
 import 'package:dbus/dbus.dart';
 import 'package:test/test.dart';
 import 'package:xdg_desktop_portal/xdg_desktop_portal.dart';
+
+class MockUri {
+  final String parentWindow;
+  final String uri;
+  final Map<String, DBusValue> options;
+
+  MockUri(this.parentWindow, this.uri, this.options);
+  @override
+  int get hashCode => Object.hash(parentWindow, uri, options);
+
+  @override
+  bool operator ==(other) {
+    if (identical(this, other)) return true;
+    final mapEquals = const DeepCollectionEquality().equals;
+
+    return other is MockUri &&
+        other.parentWindow == parentWindow &&
+        other.uri == uri &&
+        mapEquals(other.options, options);
+  }
+
+  @override
+  String toString() => '$runtimeType($parentWindow, $uri $options)';
+}
+
+class MockPortalRequestObject extends DBusObject {
+  final MockPortalServer server;
+  var closed = false;
+
+  MockPortalRequestObject(this.server, String id)
+      : super(DBusObjectPath('/org/freedesktop/portal/desktop/request/$id'));
+
+  @override
+  Future<DBusMethodResponse> handleMethodCall(DBusMethodCall methodCall) async {
+    if (methodCall.interface != 'org.freedesktop.impl.portal.Request') {
+      return DBusMethodErrorResponse.unknownInterface();
+    }
+
+    if (methodCall.name == 'Close') {
+      closed = true;
+      return DBusMethodSuccessResponse();
+    } else {
+      return DBusMethodErrorResponse.unknownMethod();
+    }
+  }
+}
 
 class MockPortalObject extends DBusObject {
   final MockPortalServer server;
@@ -16,6 +63,8 @@ class MockPortalObject extends DBusObject {
     switch (methodCall.interface) {
       case 'org.freedesktop.portal.Notification':
         return handleNotificationMethodCall(methodCall.name, methodCall.values);
+      case 'org.freedesktop.portal.OpenURI':
+        return handleOpenURIMethodCall(methodCall.name, methodCall.values);
       case 'org.freedesktop.portal.ProxyResolver':
         return handleProxyResolverMethodCall(
             methodCall.name, methodCall.values);
@@ -38,6 +87,21 @@ class MockPortalObject extends DBusObject {
         var id = values[0].asString();
         server.notifications.remove(id);
         return DBusMethodSuccessResponse();
+      default:
+        return DBusMethodErrorResponse.unknownMethod();
+    }
+  }
+
+  Future<DBusMethodResponse> handleOpenURIMethodCall(
+      String name, List<DBusValue> values) async {
+    switch (name) {
+      case 'OpenURI':
+        var parentWindow = values[0].asString();
+        var uri = values[1].asString();
+        var options = values[2].asStringVariantDict();
+        server.openedUris.add(MockUri(parentWindow, uri, options));
+        var request = await server.addRequest();
+        return DBusMethodSuccessResponse([request.path]);
       default:
         return DBusMethodErrorResponse.unknownMethod();
     }
@@ -89,9 +153,13 @@ class MockPortalObject extends DBusObject {
 
 class MockPortalServer extends DBusClient {
   late final MockPortalObject _root;
+
+  final requests = <MockPortalRequestObject>[];
+
   late final Map<String, Map<String, DBusValue>> notifications;
   final Map<String, List<String>> proxies;
   final Map<String, Map<String, DBusValue>> settingsValues;
+  final openedUris = <MockUri>[];
 
   MockPortalServer(DBusAddress clientAddress,
       {Map<String, Map<String, DBusValue>>? notifications,
@@ -105,6 +173,12 @@ class MockPortalServer extends DBusClient {
   Future<void> start() async {
     await requestName('org.freedesktop.portal.Desktop');
     await registerObject(_root);
+  }
+
+  Future<MockPortalRequestObject> addRequest() async {
+    var object = MockPortalRequestObject(this, '${requests.length}');
+    await registerObject(object);
+    return object;
   }
 }
 
@@ -322,6 +396,41 @@ void main() {
 
     await client.notification.removeNotification('123');
     expect(portalServer.notifications, equals({'122': {}, '124': {}}));
+  });
+
+  test('open uri', () async {
+    var server = DBusServer();
+    var clientAddress =
+        await server.listenAddress(DBusAddress.unix(dir: Directory.systemTemp));
+    addTearDown(() async {
+      await server.close();
+    });
+
+    var portalServer = MockPortalServer(clientAddress);
+    await portalServer.start();
+    addTearDown(() async {
+      await portalServer.close();
+    });
+
+    var client = XdgDesktopPortalClient(bus: DBusClient(clientAddress));
+    addTearDown(() async {
+      await client.close();
+    });
+
+    await client.openUri.openUri('http://example.com',
+        parentWindow: 'x11:12345',
+        writable: true,
+        ask: true,
+        activationToken: 'token');
+    expect(
+        portalServer.openedUris,
+        equals([
+          MockUri('x11:12345', 'http://example.com', {
+            'writable': DBusBoolean(true),
+            'ask': DBusBoolean(true),
+            'activation_token': DBusString('token')
+          })
+        ]));
   });
 
   test('proxy resolver', () async {
