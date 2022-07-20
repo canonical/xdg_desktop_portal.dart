@@ -160,6 +160,9 @@ class XdgNotificationPortal {
 
   XdgNotificationPortal(this.client);
 
+  /// Send a notification.
+  /// [id] can be used later to withdraw the notification with [removeNotification].
+  /// If [id] is reused without withdrawing, the existing notification is replaced.
   Future<void> addNotification(String id,
       {String? title,
       String? body,
@@ -218,6 +221,7 @@ class XdgNotificationPortal {
         replySignature: DBusSignature(''));
   }
 
+  /// Withdraw a notification created with [addNotification].
   Future<void> removeNotification(String id) async {
     await client._object.callMethod('org.freedesktop.portal.Notification',
         'RemoveNotification', [DBusString(id)],
@@ -232,6 +236,8 @@ class XdgProxyResolverPortal {
 
   XdgProxyResolverPortal(this.client);
 
+  /// Looks up which proxy to use to connect to [uri].
+  /// 'direct://' is returned when no proxy is needed.
   Future<List<String>> lookup(String uri) async {
     var result = await client._object.callMethod(
         'org.freedesktop.portal.ProxyResolver', 'Lookup', [DBusString(uri)],
@@ -247,6 +253,7 @@ class XdgSettingsPortal {
 
   XdgSettingsPortal(this.client);
 
+  /// Read a single value.
   Future<DBusValue> read(String namespace, String key) async {
     var result = await client._object.callMethod(
         'org.freedesktop.portal.Settings',
@@ -256,6 +263,8 @@ class XdgSettingsPortal {
     return result.returnValues[0].asVariant();
   }
 
+  /// Read all the the settings in the given [namespaces].
+  /// Globbing is allowed on trailing sections, e.g. 'com.example.*'.
   Future<Map<String, Map<String, DBusValue>>> readAll(
       Iterable<String> namespaces) async {
     var result = await client._object.callMethod(
