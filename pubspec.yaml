@@ -15,7 +15,7 @@ platforms:
 
 dependencies:
   collection: ^1.15.0
-  dbus: ^0.7.0
+  dbus: ^0.7.7
 
 dev_dependencies:
   lints: ^2.0.0
