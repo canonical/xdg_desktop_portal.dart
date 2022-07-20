@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.2
+
+* Added proxy resolver, open URI and email portals.
+* Fix actions on notification portal.
+
 ## 0.1.1
 
 * Added notification portal.
