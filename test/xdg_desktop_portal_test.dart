@@ -77,6 +77,28 @@ class MockPortalRequestObject extends DBusObject {
   }
 }
 
+class MockPortalSessionObject extends DBusObject {
+  final MockPortalServer server;
+  var closed = false;
+
+  MockPortalSessionObject(this.server, String token)
+      : super(DBusObjectPath('/org/freedesktop/portal/desktop/session/$token'));
+
+  @override
+  Future<DBusMethodResponse> handleMethodCall(DBusMethodCall methodCall) async {
+    if (methodCall.interface != 'org.freedesktop.impl.portal.Session') {
+      return DBusMethodErrorResponse.unknownInterface();
+    }
+
+    if (methodCall.name == 'Close') {
+      closed = true;
+      return DBusMethodSuccessResponse();
+    } else {
+      return DBusMethodErrorResponse.unknownMethod();
+    }
+  }
+}
+
 class MockPortalObject extends DBusObject {
   final MockPortalServer server;
 
@@ -88,6 +110,8 @@ class MockPortalObject extends DBusObject {
     switch (methodCall.interface) {
       case 'org.freedesktop.portal.Email':
         return handleEmailMethodCall(methodCall);
+      case 'org.freedesktop.portal.Location':
+        return handleLocationMethodCall(methodCall);
       case 'org.freedesktop.portal.Notification':
         return handleNotificationMethodCall(methodCall);
       case 'org.freedesktop.portal.OpenURI':
@@ -113,6 +137,58 @@ class MockPortalObject extends DBusObject {
             options['handle_token']?.asString() ?? server.generateToken();
         options.removeWhere((key, value) => key == 'handle_token');
         var request = await server.addRequest(methodCall.sender, token);
+        return DBusMethodSuccessResponse([request.path]);
+      default:
+        return DBusMethodErrorResponse.unknownMethod();
+    }
+  }
+
+  Future<DBusMethodResponse> handleLocationMethodCall(
+      DBusMethodCall methodCall) async {
+    switch (methodCall.name) {
+      case 'CreateSession':
+        var options = methodCall.values[0].asStringVariantDict();
+        var token = options['session_handle_token']?.asString();
+        if (token == null) {
+          return DBusMethodErrorResponse.invalidArgs('Missing token');
+        }
+        var session = await server.addSession(token);
+        return DBusMethodSuccessResponse([session.path]);
+      case 'Start':
+        var path = methodCall.values[0].asObjectPath();
+        var parentWindow = methodCall.values[1].asString();
+        var options = methodCall.values[2].asStringVariantDict();
+        server.lastParentWindow = parentWindow;
+        var token =
+            options['handle_token']?.asString() ?? server.generateToken();
+        var request = await server.addRequest(methodCall.sender, token);
+        var location = <String, DBusValue>{};
+        if (server.latitude != null) {
+          location['Latitude'] = DBusDouble(server.latitude!);
+        }
+        if (server.longitude != null) {
+          location['Longitude'] = DBusDouble(server.longitude!);
+        }
+        if (server.altitude != null) {
+          location['Altitude'] = DBusDouble(server.altitude!);
+        }
+        if (server.accuracy != null) {
+          location['Accuracy'] = DBusDouble(server.accuracy!);
+        }
+        if (server.speed != null) {
+          location['Speed'] = DBusDouble(server.speed!);
+        }
+        if (server.heading != null) {
+          location['Heading'] = DBusDouble(server.heading!);
+        }
+        if (server.locationTimestamp != null) {
+          location['Timestamp'] = DBusStruct([
+            DBusUint64(server.locationTimestamp! ~/ 1000000),
+            DBusUint64(server.locationTimestamp! % 1000000)
+          ]);
+        }
+        await emitSignal('org.freedesktop.portal.Location', 'LocationUpdated',
+            [path, DBusDict.stringVariant(location)]);
         return DBusMethodSuccessResponse([request.path]);
       default:
         return DBusMethodErrorResponse.unknownMethod();
@@ -208,6 +284,13 @@ class MockPortalServer extends DBusClient {
   late final Map<String, Map<String, DBusValue>> notifications;
   final Map<String, List<String>> proxies;
   final Map<String, Map<String, DBusValue>> settingsValues;
+  final double? latitude;
+  final double? longitude;
+  final double? altitude;
+  final double? accuracy;
+  final double? speed;
+  final double? heading;
+  final int? locationTimestamp;
 
   String? lastParentWindow;
   final composedEmails = <MockEmail>[];
@@ -216,7 +299,14 @@ class MockPortalServer extends DBusClient {
   MockPortalServer(DBusAddress clientAddress,
       {Map<String, Map<String, DBusValue>>? notifications,
       this.proxies = const {},
-      this.settingsValues = const {}})
+      this.settingsValues = const {},
+      this.latitude,
+      this.longitude,
+      this.altitude,
+      this.accuracy,
+      this.speed,
+      this.heading,
+      this.locationTimestamp})
       : super(clientAddress) {
     _root = MockPortalObject(this);
     this.notifications = notifications ?? {};
@@ -241,6 +331,12 @@ class MockPortalServer extends DBusClient {
   Future<MockPortalRequestObject> addRequest(
       String sender, String token) async {
     var object = MockPortalRequestObject(this, sender, token);
+    await registerObject(object);
+    return object;
+  }
+
+  Future<MockPortalSessionObject> addSession(String token) async {
+    var object = MockPortalSessionObject(this, token);
     await registerObject(object);
     return object;
   }
@@ -288,6 +384,48 @@ void main() {
             'body': DBusString('Would you like to buy some encyclopedias?')
           })
         ]));
+  });
+
+  test('get location', () async {
+    var server = DBusServer();
+    var clientAddress =
+        await server.listenAddress(DBusAddress.unix(dir: Directory.systemTemp));
+    addTearDown(() async {
+      await server.close();
+    });
+
+    var portalServer = MockPortalServer(clientAddress,
+        latitude: 40.9,
+        longitude: 174.9,
+        altitude: 42.0,
+        accuracy: 1.2,
+        speed: 28,
+        heading: 321.4,
+        locationTimestamp: 1658718568000000);
+    await portalServer.start();
+    addTearDown(() async {
+      await portalServer.close();
+    });
+
+    var client = XdgDesktopPortalClient(bus: DBusClient(clientAddress));
+    addTearDown(() async {
+      await client.close();
+    });
+
+    var session = await client.location.createSession();
+    session.locationUpdated.listen(expectAsync1((location) => expect(
+        location,
+        equals(XdgLocation(
+            latitude: 40.9,
+            longitude: 174.9,
+            altitude: 42.0,
+            accuracy: 1.2,
+            speed: 28.0,
+            heading: 321.4,
+            timestamp:
+                DateTime.fromMicrosecondsSinceEpoch(1658718568000000))))));
+    await session.start(parentWindow: 'x11:12345');
+    expect(portalServer.lastParentWindow, equals('x11:12345'));
   });
 
   test('add notification', () async {
