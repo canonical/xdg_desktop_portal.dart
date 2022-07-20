@@ -20,6 +20,50 @@ class XdgPortalRequest {
   }
 }
 
+/// Portal to send email.
+class XdgEmailPortal {
+  /// The client that is connected to this portal.
+  XdgDesktopPortalClient client;
+
+  XdgEmailPortal(this.client);
+
+  /// Present a window to compose an email.
+  Future<XdgPortalRequest> composeEmail(
+      {String parentWindow = '',
+      String? address,
+      Iterable<String> addresses = const [],
+      Iterable<String> cc = const [],
+      Iterable<String> bcc = const [],
+      String? subject,
+      String? body}) async {
+    var options = <String, DBusValue>{};
+    if (address != null) {
+      options['address'] = DBusString(address);
+    }
+    if (addresses.isNotEmpty) {
+      options['addresses'] = DBusArray.string(addresses);
+    }
+    if (cc.isNotEmpty) {
+      options['cc'] = DBusArray.string(cc);
+    }
+    if (bcc.isNotEmpty) {
+      options['bcc'] = DBusArray.string(bcc);
+    }
+    if (subject != null) {
+      options['subject'] = DBusString(subject);
+    }
+    if (body != null) {
+      options['body'] = DBusString(body);
+    }
+    var result = await client._object.callMethod(
+        'org.freedesktop.portal.Email',
+        'ComposeEmail',
+        [DBusString(parentWindow), DBusDict.stringVariant(options)],
+        replySignature: DBusSignature('o'));
+    return XdgPortalRequest(client, result.returnValues[0].asObjectPath());
+  }
+}
+
 /// Portal to open URIs.
 class XdgOpenUriPortal {
   /// The client that is connected to this portal.
@@ -232,6 +276,9 @@ class XdgDesktopPortalClient {
 
   late final DBusRemoteObject _object;
 
+  /// Portal to send email.
+  late final XdgEmailPortal email;
+
   /// Portal to create notifications.
   late final XdgNotificationPortal notification;
 
@@ -251,6 +298,7 @@ class XdgDesktopPortalClient {
     _object = DBusRemoteObject(_bus,
         name: 'org.freedesktop.portal.Desktop',
         path: DBusObjectPath('/org/freedesktop/portal/desktop'));
+    email = XdgEmailPortal(this);
     notification = XdgNotificationPortal(this);
     openUri = XdgOpenUriPortal(this);
     proxyResolver = XdgProxyResolverPortal(this);

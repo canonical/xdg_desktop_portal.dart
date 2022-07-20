@@ -6,12 +6,36 @@ import 'package:dbus/dbus.dart';
 import 'package:test/test.dart';
 import 'package:xdg_desktop_portal/xdg_desktop_portal.dart';
 
+class MockEmail {
+  final String parentWindow;
+  final Map<String, DBusValue> options;
+
+  MockEmail(this.parentWindow, this.options);
+
+  @override
+  int get hashCode => Object.hash(parentWindow, options);
+
+  @override
+  bool operator ==(other) {
+    if (identical(this, other)) return true;
+    final mapEquals = const DeepCollectionEquality().equals;
+
+    return other is MockEmail &&
+        other.parentWindow == parentWindow &&
+        mapEquals(other.options, options);
+  }
+
+  @override
+  String toString() => '$runtimeType($parentWindow, $options)';
+}
+
 class MockUri {
   final String parentWindow;
   final String uri;
   final Map<String, DBusValue> options;
 
   MockUri(this.parentWindow, this.uri, this.options);
+
   @override
   int get hashCode => Object.hash(parentWindow, uri, options);
 
@@ -27,7 +51,7 @@ class MockUri {
   }
 
   @override
-  String toString() => '$runtimeType($parentWindow, $uri $options)';
+  String toString() => '$runtimeType($parentWindow, $uri, $options)';
 }
 
 class MockPortalRequestObject extends DBusObject {
@@ -61,6 +85,8 @@ class MockPortalObject extends DBusObject {
   @override
   Future<DBusMethodResponse> handleMethodCall(DBusMethodCall methodCall) async {
     switch (methodCall.interface) {
+      case 'org.freedesktop.portal.Email':
+        return handleEmailMethodCall(methodCall.name, methodCall.values);
       case 'org.freedesktop.portal.Notification':
         return handleNotificationMethodCall(methodCall.name, methodCall.values);
       case 'org.freedesktop.portal.OpenURI':
@@ -72,6 +98,20 @@ class MockPortalObject extends DBusObject {
         return handleSettingsMethodCall(methodCall.name, methodCall.values);
       default:
         return DBusMethodErrorResponse.unknownInterface();
+    }
+  }
+
+  Future<DBusMethodResponse> handleEmailMethodCall(
+      String name, List<DBusValue> values) async {
+    switch (name) {
+      case 'ComposeEmail':
+        var parentWindow = values[0].asString();
+        var options = values[1].asStringVariantDict();
+        server.composedEmails.add(MockEmail(parentWindow, options));
+        var request = await server.addRequest();
+        return DBusMethodSuccessResponse([request.path]);
+      default:
+        return DBusMethodErrorResponse.unknownMethod();
     }
   }
 
@@ -159,6 +199,7 @@ class MockPortalServer extends DBusClient {
   late final Map<String, Map<String, DBusValue>> notifications;
   final Map<String, List<String>> proxies;
   final Map<String, Map<String, DBusValue>> settingsValues;
+  final composedEmails = <MockEmail>[];
   final openedUris = <MockUri>[];
 
   MockPortalServer(DBusAddress clientAddress,
@@ -183,6 +224,48 @@ class MockPortalServer extends DBusClient {
 }
 
 void main() {
+  test('email', () async {
+    var server = DBusServer();
+    var clientAddress =
+        await server.listenAddress(DBusAddress.unix(dir: Directory.systemTemp));
+    addTearDown(() async {
+      await server.close();
+    });
+
+    var portalServer = MockPortalServer(clientAddress);
+    await portalServer.start();
+    addTearDown(() async {
+      await portalServer.close();
+    });
+
+    var client = XdgDesktopPortalClient(bus: DBusClient(clientAddress));
+    addTearDown(() async {
+      await client.close();
+    });
+
+    await client.email.composeEmail(
+        parentWindow: 'x11:12345',
+        address: 'alice@example.com',
+        addresses: ['bob@example.com', 'carol@example.com'],
+        cc: ['dave@example.com'],
+        bcc: ['elle@example.com'],
+        subject: 'Great Opportunity',
+        body: 'Would you like to buy some encyclopedias?');
+    expect(
+        portalServer.composedEmails,
+        equals([
+          MockEmail('x11:12345', {
+            'address': DBusString('alice@example.com'),
+            'addresses':
+                DBusArray.string(['bob@example.com', 'carol@example.com']),
+            'cc': DBusArray.string(['dave@example.com']),
+            'bcc': DBusArray.string(['elle@example.com']),
+            'subject': DBusString('Great Opportunity'),
+            'body': DBusString('Would you like to buy some encyclopedias?')
+          })
+        ]));
+  });
+
   test('add notification', () async {
     var server = DBusServer();
     var clientAddress =
