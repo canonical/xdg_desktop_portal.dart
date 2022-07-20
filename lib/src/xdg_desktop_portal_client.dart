@@ -22,6 +22,29 @@ class XdgPortalRequest {
   }
 }
 
+/// A session opened on a portal.
+class XdgPortalSession {
+  /// The client that is connected to this portal.
+  XdgDesktopPortalClient client;
+
+  /// true when this session has been closed by the portal.
+  final _closedCompleter = Completer<bool>();
+  Future<bool> get closed => _closedCompleter.future;
+
+  late final DBusRemoteObject _object;
+
+  XdgPortalSession(this.client, DBusObjectPath path) {
+    _object =
+        DBusRemoteObject(client._bus, name: client._object.name, path: path);
+  }
+
+  /// Close the session.
+  Future<void> close() async {
+    await _object.callMethod('org.freedesktop.impl.portal.Session', 'Close', [],
+        replySignature: DBusSignature(''));
+  }
+}
+
 /// Portal to send email.
 class XdgEmailPortal {
   /// The client that is connected to this portal.
@@ -157,6 +180,176 @@ class XdgNotificationButton {
   XdgNotificationButton({required this.label, required this.action});
 }
 
+/// Requested accuracy of location information.
+enum XdgLocationAccuracy { none, country, city, neighborhood, street, exact }
+
+/// Location information.
+class XdgLocation {
+  // The latitude, in degrees.
+  final double? latitude;
+
+  // The longitude, in degrees.
+  final double? longitude;
+
+  // The altitude, in meters.
+  final double? altitude;
+
+  /// The accuracy, in meters.
+  final double? accuracy;
+
+  /// The speed, in meters per second.
+  final double? speed;
+
+  /// The heading, in degrees, going clockwise. North 0, East 90, South 180, West 270.
+  final double? heading;
+
+  /// Time time this location was recorded.
+  final DateTime? timestamp;
+
+  XdgLocation(
+      {this.latitude,
+      this.longitude,
+      this.altitude,
+      this.accuracy,
+      this.speed,
+      this.heading,
+      this.timestamp});
+
+  @override
+  int get hashCode => Object.hash(
+      latitude, longitude, altitude, accuracy, speed, heading, timestamp);
+
+  @override
+  bool operator ==(other) =>
+      other is XdgLocation &&
+      other.latitude == latitude &&
+      other.longitude == longitude &&
+      other.altitude == altitude &&
+      other.accuracy == accuracy &&
+      other.speed == speed &&
+      other.heading == heading &&
+      other.timestamp == timestamp;
+
+  @override
+  String toString() =>
+      '$runtimeType(latitude: $latitude, longitude: $longitude, altitude: $altitude, accuracy: $accuracy, speed: $speed, heading: $heading, timestamp: $timestamp)';
+}
+
+class XdgLocationSession extends XdgPortalSession {
+  final _locationUpdated = StreamController<XdgLocation>();
+
+  /// Stream of location updates from the portal.
+  Stream<XdgLocation> get locationUpdated => _locationUpdated.stream;
+
+  XdgLocationSession(XdgDesktopPortalClient client, DBusObjectPath path)
+      : super(client, path);
+
+  /// Start this session.
+  Future<XdgPortalRequest> start({String parentWindow = ''}) async {
+    var options = <String, DBusValue>{};
+    var result = await client._object.callMethod(
+        'org.freedesktop.portal.Location',
+        'Start',
+        [
+          _object.path,
+          DBusString(parentWindow),
+          DBusDict.stringVariant(options)
+        ],
+        replySignature: DBusSignature('o'));
+    var handle = result.returnValues[0].asObjectPath();
+    return XdgPortalRequest(client, handle);
+  }
+}
+
+/// Portal to get location information.
+class XdgLocationPortal {
+  /// The client that is connected to this portal.
+  XdgDesktopPortalClient client;
+
+  late final StreamSubscription _locationUpdatedSubscription;
+
+  XdgLocationPortal(this.client) {
+    var locationUpdated = DBusSignalStream(client._bus,
+        interface: 'org.freedesktop.portal.Location',
+        name: 'LocationUpdated',
+        path: client._object.path,
+        signature: DBusSignature('oa{sv}'));
+    _locationUpdatedSubscription = locationUpdated.listen((signal) {
+      var path = signal.values[0].asObjectPath();
+      var session = client._sessions[path];
+      if (session == null || session is! XdgLocationSession) {
+        return;
+      }
+      var location = signal.values[1].asStringVariantDict();
+      double? getLocationValue(String name) {
+        var value = location[name];
+        if (value == null || value is! DBusDouble) {
+          return null;
+        }
+        return value.asDouble();
+      }
+
+      DateTime? timestamp;
+      var timestampValue = location['Timestamp'];
+      if (timestampValue != null &&
+          timestampValue.signature == DBusSignature('(tt)')) {
+        var values = timestampValue.asStruct();
+        var s = values[0].asUint64();
+        var us = values[1].asUint64();
+        timestamp = DateTime.fromMicrosecondsSinceEpoch(s * 1000000 + us);
+      }
+
+      session._locationUpdated.add(XdgLocation(
+          latitude: getLocationValue('Latitude'),
+          longitude: getLocationValue('Longitude'),
+          altitude: getLocationValue('Altitude'),
+          accuracy: getLocationValue('Accuracy'),
+          speed: getLocationValue('Speed'),
+          heading: getLocationValue('Heading'),
+          timestamp: timestamp));
+    });
+  }
+
+  /// Create a location session.
+  Future<XdgLocationSession> createSession(
+      {int? distanceThreshold,
+      int? timeThreshold,
+      XdgLocationAccuracy? accuracy}) async {
+    var options = <String, DBusValue>{};
+    options['session_handle_token'] = DBusString(client._generateToken());
+    if (distanceThreshold != null) {
+      options['distance-threshold'] = DBusUint32(distanceThreshold);
+    }
+    if (timeThreshold != null) {
+      options['time-threshold'] = DBusUint32(timeThreshold);
+    }
+    if (accuracy != null) {
+      options['accuracy'] = DBusUint32({
+            XdgLocationAccuracy.none: 0,
+            XdgLocationAccuracy.country: 1,
+            XdgLocationAccuracy.city: 2,
+            XdgLocationAccuracy.neighborhood: 3,
+            XdgLocationAccuracy.street: 4,
+            XdgLocationAccuracy.exact: 5
+          }[accuracy] ??
+          5);
+    }
+    var result = await client._object.callMethod(
+        'org.freedesktop.portal.Location',
+        'CreateSession',
+        [DBusDict.stringVariant(options)],
+        replySignature: DBusSignature('o'));
+    var session =
+        XdgLocationSession(client, result.returnValues[0].asObjectPath());
+    client._addSession(session);
+    return session;
+  }
+
+  Future<void> _close() async {
+    await _locationUpdatedSubscription.cancel();
+  }
+}
+
 /// Portal to create notifications.
 class XdgNotificationPortal {
   /// The client that is connected to this portal.
@@ -289,8 +482,15 @@ class XdgDesktopPortalClient {
 
   late final DBusRemoteObject _object;
 
+  late final StreamSubscription _sessionClosedSubscription;
+
+  final _sessions = <DBusObjectPath, XdgPortalSession>{};
+
   /// Portal to send email.
   late final XdgEmailPortal email;
+
+  /// Portal to get location information.
+  late final XdgLocationPortal location;
 
   /// Portal to create notifications.
   late final XdgNotificationPortal notification;
@@ -314,7 +514,18 @@ class XdgDesktopPortalClient {
     _object = DBusRemoteObject(_bus,
         name: 'org.freedesktop.portal.Desktop',
         path: DBusObjectPath('/org/freedesktop/portal/desktop'));
+    var sessionClosed = DBusSignalStream(_bus,
+        interface: 'org.freedesktop.impl.portal.Session',
+        name: 'Closed',
+        signature: DBusSignature(''));
+    _sessionClosedSubscription = sessionClosed.listen((signal) {
+      var session = _sessions[signal.path];
+      if (session != null) {
+        session._closedCompleter.complete(true);
+      }
+    });
     email = XdgEmailPortal(this);
+    location = XdgLocationPortal(this);
     notification = XdgNotificationPortal(this);
     openUri = XdgOpenUriPortal(this);
     proxyResolver = XdgProxyResolverPortal(this);
@@ -323,6 +534,8 @@ class XdgDesktopPortalClient {
 
   /// Terminates all active connections. If a client remains unclosed, the Dart process may not terminate.
   Future<void> close() async {
+    await _sessionClosedSubscription.cancel();
+    await location._close();
     if (_closeBus) {
       await _bus.close();
     }
@@ -337,5 +550,11 @@ class XdgDesktopPortalClient {
     } while (_usedTokens.contains(token));
     _usedTokens.add(token);
     return token;
+  }
+
+  /// Record an active portal session.
+  XdgPortalSession _addSession(XdgPortalSession session) {
+    _sessions[session._object.path] = session;
+    return session;
   }
 }
