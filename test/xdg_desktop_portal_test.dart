@@ -8,37 +8,37 @@ import 'package:test/test.dart';
 import 'package:xdg_desktop_portal/xdg_desktop_portal.dart';
 
 class MockEmail {
-  final String parentWindow;
   final Map<String, DBusValue> options;
 
-  MockEmail(this.parentWindow, this.options);
+  MockEmail(this.options);
 
   @override
-  int get hashCode => Object.hash(parentWindow, options);
+  int get hashCode => Object.hashAll(
+      options.entries.map((entry) => Object.hash(entry.key, entry.value)));
 
   @override
   bool operator ==(other) {
     if (identical(this, other)) return true;
     final mapEquals = const DeepCollectionEquality().equals;
 
-    return other is MockEmail &&
-        other.parentWindow == parentWindow &&
-        mapEquals(other.options, options);
+    return other is MockEmail && mapEquals(other.options, options);
   }
 
   @override
-  String toString() => '$runtimeType($parentWindow, $options)';
+  String toString() => '$runtimeType($options)';
 }
 
 class MockUri {
-  final String parentWindow;
   final String uri;
   final Map<String, DBusValue> options;
 
-  MockUri(this.parentWindow, this.uri, this.options);
+  MockUri(this.uri, this.options);
 
   @override
-  int get hashCode => Object.hash(parentWindow, uri, options);
+  int get hashCode => Object.hash(
+      uri,
+      Object.hashAll(
+          options.entries.map((entry) => Object.hash(entry.key, entry.value))));
 
   @override
   bool operator ==(other) {
@@ -46,13 +46,12 @@ class MockUri {
     final mapEquals = const DeepCollectionEquality().equals;
 
     return other is MockUri &&
-        other.parentWindow == parentWindow &&
         other.uri == uri &&
         mapEquals(other.options, options);
   }
 
   @override
-  String toString() => '$runtimeType($parentWindow, $uri, $options)';
+  String toString() => '$runtimeType($uri, $options)';
 }
 
 class MockPortalRequestObject extends DBusObject {
@@ -108,7 +107,8 @@ class MockPortalObject extends DBusObject {
       case 'ComposeEmail':
         var parentWindow = methodCall.values[0].asString();
         var options = methodCall.values[1].asStringVariantDict();
-        server.composedEmails.add(MockEmail(parentWindow, options));
+        server.lastParentWindow = parentWindow;
+        server.composedEmails.add(MockEmail(options));
         var token =
             options['handle_token']?.asString() ?? server.generateToken();
         options.removeWhere((key, value) => key == 'handle_token');
@@ -146,7 +146,8 @@ class MockPortalObject extends DBusObject {
         var token =
             options['handle_token']?.asString() ?? server.generateToken();
         options.removeWhere((key, value) => key == 'handle_token');
-        server.openedUris.add(MockUri(parentWindow, uri, options));
+        server.lastParentWindow = parentWindow;
+        server.openedUris.add(MockUri(uri, options));
         var request = await server.addRequest(methodCall.sender, token);
         return DBusMethodSuccessResponse([request.path]);
       default:
@@ -207,6 +208,8 @@ class MockPortalServer extends DBusClient {
   late final Map<String, Map<String, DBusValue>> notifications;
   final Map<String, List<String>> proxies;
   final Map<String, Map<String, DBusValue>> settingsValues;
+
+  String? lastParentWindow;
   final composedEmails = <MockEmail>[];
   final openedUris = <MockUri>[];
 
@@ -271,10 +274,11 @@ void main() {
         bcc: ['elle@example.com'],
         subject: 'Great Opportunity',
         body: 'Would you like to buy some encyclopedias?');
+    expect(portalServer.lastParentWindow, equals('x11:12345'));
     expect(
         portalServer.composedEmails,
         equals([
-          MockEmail('x11:12345', {
+          MockEmail({
             'address': DBusString('alice@example.com'),
             'addresses':
                 DBusArray.string(['bob@example.com', 'carol@example.com']),
@@ -525,10 +529,11 @@ void main() {
         writable: true,
         ask: true,
         activationToken: 'token');
+    expect(portalServer.lastParentWindow, equals('x11:12345'));
     expect(
         portalServer.openedUris,
         equals([
-          MockUri('x11:12345', 'http://example.com', {
+          MockUri('http://example.com', {
             'writable': DBusBoolean(true),
             'ask': DBusBoolean(true),
             'activation_token': DBusString('token')
