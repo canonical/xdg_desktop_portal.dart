@@ -90,47 +90,6 @@ class XdgEmailPortal {
   }
 }
 
-/// Portal to open URIs.
-class XdgOpenUriPortal {
-  /// The client that is connected to this portal.
-  XdgDesktopPortalClient client;
-
-  XdgOpenUriPortal(this.client);
-
-  /// Ask to open a URI.
-  Future<XdgPortalRequest> openUri(String uri,
-      {String parentWindow = '',
-      bool? writable,
-      bool? ask,
-      String? activationToken}) async {
-    var options = <String, DBusValue>{};
-    options['handle_token'] = DBusString(client._generateToken());
-    if (writable != null) {
-      options['writable'] = DBusBoolean(writable);
-    }
-    if (ask != null) {
-      options['ask'] = DBusBoolean(ask);
-    }
-    if (activationToken != null) {
-      options['activation_token'] = DBusString(activationToken);
-    }
-    var result = await client._object.callMethod(
-        'org.freedesktop.portal.OpenURI',
-        'OpenURI',
-        [
-          DBusString(parentWindow),
-          DBusString(uri),
-          DBusDict.stringVariant(options)
-        ],
-        replySignature: DBusSignature('o'));
-    return XdgPortalRequest(client, result.returnValues[0].asObjectPath());
-  }
-
-  // FIXME: OpenFile
-
-  // FIXME: OpenDirectory
-}
-
 /// Priorities for notifications.
 enum XdgNotificationPriority { low, normal, high, urgent }
 
@@ -178,6 +137,82 @@ class XdgNotificationButton {
   final String action;
 
   XdgNotificationButton({required this.label, required this.action});
+}
+
+/// Portal to create notifications.
+class XdgNotificationPortal {
+  /// The client that is connected to this portal.
+  XdgDesktopPortalClient client;
+
+  XdgNotificationPortal(this.client);
+
+  /// Send a notification.
+  /// [id] can be used later to withdraw the notification with [removeNotification].
+  /// If [id] is reused without withdrawing, the existing notification is replaced.
+  Future<void> addNotification(String id,
+      {String? title,
+      String? body,
+      XdgNotificationIcon? icon,
+      XdgNotificationPriority? priority,
+      String? defaultAction,
+      List<XdgNotificationButton> buttons = const []}) async {
+    var notification = <String, DBusValue>{};
+    if (title != null) {
+      notification['title'] = DBusString(title);
+    }
+    if (body != null) {
+      notification['body'] = DBusString(body);
+    }
+    if (icon != null) {
+      if (icon is XdgNotificationIconFile) {
+        notification['icon'] = DBusStruct(
+            [DBusString('file'), DBusVariant(DBusString(icon.path))]);
+      } else if (icon is XdgNotificationIconUri) {
+        notification['icon'] =
+            DBusStruct([DBusString('file'), DBusVariant(DBusString(icon.uri))]);
+      } else if (icon is XdgNotificationIconThemed) {
+        notification['icon'] = DBusStruct(
+            [DBusString('themed'), DBusVariant(DBusArray.string(icon.names))]);
+      } else if (icon is XdgNotificationIconData) {
+        notification['icon'] = DBusStruct(
+            [DBusString('bytes'), DBusVariant(DBusArray.byte(icon.data))]);
+      }
+    }
+    if (priority != null) {
+      notification['priority'] = DBusString({
+            XdgNotificationPriority.low: 'low',
+            XdgNotificationPriority.normal: 'normal',
+            XdgNotificationPriority.high: 'high',
+            XdgNotificationPriority.urgent: 'urgent'
+          }[priority] ??
+          'normal');
+    }
+    if (defaultAction != null) {
+      notification['default-action'] = DBusString(defaultAction);
+    }
+    if (buttons.isNotEmpty) {
+      notification['buttons'] =
+          DBusArray(DBusSignature('a{sv}'), buttons.map((button) {
+        var values = {
+          'label': DBusString(button.label),
+          'action': DBusString(button.action)
+        };
+        return DBusDict.stringVariant(values);
+      }));
+    }
+    await client._object.callMethod(
+        'org.freedesktop.portal.Notification',
+        'AddNotification',
+        [DBusString(id), DBusDict.stringVariant(notification)],
+        replySignature: DBusSignature(''));
+  }
+
+  /// Withdraw a notification created with [addNotification].
+  Future<void> removeNotification(String id) async {
+    await client._object.callMethod('org.freedesktop.portal.Notification',
+        'RemoveNotification', [DBusString(id)],
+        replySignature: DBusSignature(''));
+  }
 }
 
 /// Requested accuracy of location information.
@@ -351,80 +386,45 @@ class XdgLocationPortal {
   }
 }
 
-/// Portal to create notifications.
-class XdgNotificationPortal {
+/// Portal to open URIs.
+class XdgOpenUriPortal {
   /// The client that is connected to this portal.
   XdgDesktopPortalClient client;
 
-  XdgNotificationPortal(this.client);
+  XdgOpenUriPortal(this.client);
 
-  /// Send a notification.
-  /// [id] can be used later to withdraw the notification with [removeNotification].
-  /// If [id] is reused without withdrawing, the existing notification is replaced.
-  Future<void> addNotification(String id,
-      {String? title,
-      String? body,
-      XdgNotificationIcon? icon,
-      XdgNotificationPriority? priority,
-      String? defaultAction,
-      List<XdgNotificationButton> buttons = const []}) async {
-    var notification = <String, DBusValue>{};
-    if (title != null) {
-      notification['title'] = DBusString(title);
+  /// Ask to open a URI.
+  Future<XdgPortalRequest> openUri(String uri,
+      {String parentWindow = '',
+      bool? writable,
+      bool? ask,
+      String? activationToken}) async {
+    var options = <String, DBusValue>{};
+    options['handle_token'] = DBusString(client._generateToken());
+    if (writable != null) {
+      options['writable'] = DBusBoolean(writable);
     }
-    if (body != null) {
-      notification['body'] = DBusString(body);
+    if (ask != null) {
+      options['ask'] = DBusBoolean(ask);
     }
-    if (icon != null) {
-      if (icon is XdgNotificationIconFile) {
-        notification['icon'] = DBusStruct(
-            [DBusString('file'), DBusVariant(DBusString(icon.path))]);
-      } else if (icon is XdgNotificationIconUri) {
-        notification['icon'] =
-            DBusStruct([DBusString('file'), DBusVariant(DBusString(icon.uri))]);
-      } else if (icon is XdgNotificationIconThemed) {
-        notification['icon'] = DBusStruct(
-            [DBusString('themed'), DBusVariant(DBusArray.string(icon.names))]);
-      } else if (icon is XdgNotificationIconData) {
-        notification['icon'] = DBusStruct(
-            [DBusString('bytes'), DBusVariant(DBusArray.byte(icon.data))]);
-      }
+    if (activationToken != null) {
+      options['activation_token'] = DBusString(activationToken);
     }
-    if (priority != null) {
-      notification['priority'] = DBusString({
-            XdgNotificationPriority.low: 'low',
-            XdgNotificationPriority.normal: 'normal',
-            XdgNotificationPriority.high: 'high',
-            XdgNotificationPriority.urgent: 'urgent'
-          }[priority] ??
-          'normal');
-    }
-    if (defaultAction != null) {
-      notification['default-action'] = DBusString(defaultAction);
-    }
-    if (buttons.isNotEmpty) {
-      notification['buttons'] =
-          DBusArray(DBusSignature('a{sv}'), buttons.map((button) {
-        var values = {
-          'label': DBusString(button.label),
-          'action': DBusString(button.action)
-        };
-        return DBusDict.stringVariant(values);
-      }));
-    }
-    await client._object.callMethod(
-        'org.freedesktop.portal.Notification',
-        'AddNotification',
-        [DBusString(id), DBusDict.stringVariant(notification)],
-        replySignature: DBusSignature(''));
+    var result = await client._object.callMethod(
+        'org.freedesktop.portal.OpenURI',
+        'OpenURI',
+        [
+          DBusString(parentWindow),
+          DBusString(uri),
+          DBusDict.stringVariant(options)
+        ],
+        replySignature: DBusSignature('o'));
+    return XdgPortalRequest(client, result.returnValues[0].asObjectPath());
   }
 
-  /// Withdraw a notification created with [addNotification].
-  Future<void> removeNotification(String id) async {
-    await client._object.callMethod('org.freedesktop.portal.Notification',
-        'RemoveNotification', [DBusString(id)],
-        replySignature: DBusSignature(''));
-  }
+  // FIXME: OpenFile
+
+  // FIXME: OpenDirectory
 }
 
 /// Portal to use system proxy.
