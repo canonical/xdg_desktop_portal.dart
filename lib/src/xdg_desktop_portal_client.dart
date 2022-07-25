@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 import 'dart:typed_data';
 import 'package:dbus/dbus.dart';
 
@@ -38,6 +39,7 @@ class XdgEmailPortal {
       String? subject,
       String? body}) async {
     var options = <String, DBusValue>{};
+    options['handle_token'] = DBusString(client._generateToken());
     if (address != null) {
       options['address'] = DBusString(address);
     }
@@ -79,6 +81,7 @@ class XdgOpenUriPortal {
       bool? ask,
       String? activationToken}) async {
     var options = <String, DBusValue>{};
+    options['handle_token'] = DBusString(client._generateToken());
     if (writable != null) {
       options['writable'] = DBusBoolean(writable);
     }
@@ -301,6 +304,9 @@ class XdgDesktopPortalClient {
   /// Portal to access system settings.
   late final XdgSettingsPortal settings;
 
+  /// Keep track of used request/session tokens.
+  final _usedTokens = <String>{};
+
   /// Creates a new portal client. If [bus] is provided connect to the given D-Bus server.
   XdgDesktopPortalClient({DBusClient? bus})
       : _bus = bus ?? DBusClient.session(),
@@ -320,5 +326,16 @@ class XdgDesktopPortalClient {
     if (_closeBus) {
       await _bus.close();
     }
+  }
+
+  /// Generate a token for requests and sessions.
+  String _generateToken() {
+    final random = Random();
+    String token;
+    do {
+      token = 'dart${random.nextInt(1 << 32)}';
+    } while (_usedTokens.contains(token));
+    _usedTokens.add(token);
+    return token;
   }
 }

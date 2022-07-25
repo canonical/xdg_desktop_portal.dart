@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -58,8 +59,9 @@ class MockPortalRequestObject extends DBusObject {
   final MockPortalServer server;
   var closed = false;
 
-  MockPortalRequestObject(this.server, String id)
-      : super(DBusObjectPath('/org/freedesktop/portal/desktop/request/$id'));
+  MockPortalRequestObject(this.server, String sender, String token)
+      : super(DBusObjectPath(
+            '/org/freedesktop/portal/desktop/request/${sender.substring(1).replaceAll('.', '_')}/$token'));
 
   @override
   Future<DBusMethodResponse> handleMethodCall(DBusMethodCall methodCall) async {
@@ -86,29 +88,31 @@ class MockPortalObject extends DBusObject {
   Future<DBusMethodResponse> handleMethodCall(DBusMethodCall methodCall) async {
     switch (methodCall.interface) {
       case 'org.freedesktop.portal.Email':
-        return handleEmailMethodCall(methodCall.name, methodCall.values);
+        return handleEmailMethodCall(methodCall);
       case 'org.freedesktop.portal.Notification':
-        return handleNotificationMethodCall(methodCall.name, methodCall.values);
+        return handleNotificationMethodCall(methodCall);
       case 'org.freedesktop.portal.OpenURI':
-        return handleOpenURIMethodCall(methodCall.name, methodCall.values);
+        return handleOpenURIMethodCall(methodCall);
       case 'org.freedesktop.portal.ProxyResolver':
-        return handleProxyResolverMethodCall(
-            methodCall.name, methodCall.values);
+        return handleProxyResolverMethodCall(methodCall);
       case 'org.freedesktop.portal.Settings':
-        return handleSettingsMethodCall(methodCall.name, methodCall.values);
+        return handleSettingsMethodCall(methodCall);
       default:
         return DBusMethodErrorResponse.unknownInterface();
     }
   }
 
   Future<DBusMethodResponse> handleEmailMethodCall(
-      String name, List<DBusValue> values) async {
-    switch (name) {
+      DBusMethodCall methodCall) async {
+    switch (methodCall.name) {
       case 'ComposeEmail':
-        var parentWindow = values[0].asString();
-        var options = values[1].asStringVariantDict();
+        var parentWindow = methodCall.values[0].asString();
+        var options = methodCall.values[1].asStringVariantDict();
         server.composedEmails.add(MockEmail(parentWindow, options));
-        var request = await server.addRequest();
+        var token =
+            options['handle_token']?.asString() ?? server.generateToken();
+        options.removeWhere((key, value) => key == 'handle_token');
+        var request = await server.addRequest(methodCall.sender, token);
         return DBusMethodSuccessResponse([request.path]);
       default:
         return DBusMethodErrorResponse.unknownMethod();
@@ -116,15 +120,15 @@ class MockPortalObject extends DBusObject {
   }
 
   Future<DBusMethodResponse> handleNotificationMethodCall(
-      String name, List<DBusValue> values) async {
-    switch (name) {
+      DBusMethodCall methodCall) async {
+    switch (methodCall.name) {
       case 'AddNotification':
-        var id = values[0].asString();
-        var notification = values[1].asStringVariantDict();
+        var id = methodCall.values[0].asString();
+        var notification = methodCall.values[1].asStringVariantDict();
         server.notifications[id] = notification;
         return DBusMethodSuccessResponse();
       case 'RemoveNotification':
-        var id = values[0].asString();
+        var id = methodCall.values[0].asString();
         server.notifications.remove(id);
         return DBusMethodSuccessResponse();
       default:
@@ -133,14 +137,17 @@ class MockPortalObject extends DBusObject {
   }
 
   Future<DBusMethodResponse> handleOpenURIMethodCall(
-      String name, List<DBusValue> values) async {
-    switch (name) {
+      DBusMethodCall methodCall) async {
+    switch (methodCall.name) {
       case 'OpenURI':
-        var parentWindow = values[0].asString();
-        var uri = values[1].asString();
-        var options = values[2].asStringVariantDict();
+        var parentWindow = methodCall.values[0].asString();
+        var uri = methodCall.values[1].asString();
+        var options = methodCall.values[2].asStringVariantDict();
+        var token =
+            options['handle_token']?.asString() ?? server.generateToken();
+        options.removeWhere((key, value) => key == 'handle_token');
         server.openedUris.add(MockUri(parentWindow, uri, options));
-        var request = await server.addRequest();
+        var request = await server.addRequest(methodCall.sender, token);
         return DBusMethodSuccessResponse([request.path]);
       default:
         return DBusMethodErrorResponse.unknownMethod();
@@ -148,10 +155,10 @@ class MockPortalObject extends DBusObject {
   }
 
   Future<DBusMethodResponse> handleProxyResolverMethodCall(
-      String name, List<DBusValue> values) async {
-    switch (name) {
+      DBusMethodCall methodCall) async {
+    switch (methodCall.name) {
       case 'Lookup':
-        var uri = values[0].asString();
+        var uri = methodCall.values[0].asString();
         var proxies = server.proxies[uri] ?? ['direct://'];
         return DBusMethodSuccessResponse([DBusArray.string(proxies)]);
       default:
@@ -160,12 +167,12 @@ class MockPortalObject extends DBusObject {
   }
 
   Future<DBusMethodResponse> handleSettingsMethodCall(
-      String name, List<DBusValue> values) async {
-    switch (name) {
+      DBusMethodCall methodCall) async {
+    switch (methodCall.name) {
       case 'Read':
-        var namespace = values[0].asString();
+        var namespace = methodCall.values[0].asString();
         var namespaceValues = server.settingsValues[namespace] ?? {};
-        var key = values[1].asString();
+        var key = methodCall.values[1].asString();
         var value = namespaceValues[key];
         if (value == null) {
           return DBusMethodErrorResponse(
@@ -174,7 +181,7 @@ class MockPortalObject extends DBusObject {
         }
         return DBusMethodSuccessResponse([DBusVariant(value)]);
       case 'ReadAll':
-        var namespaces = values[0].asStringArray();
+        var namespaces = methodCall.values[0].asStringArray();
         var result = <DBusValue, DBusValue>{};
         for (var namespace in namespaces) {
           var settingsValues = server.settingsValues[namespace];
@@ -195,6 +202,7 @@ class MockPortalServer extends DBusClient {
   late final MockPortalObject _root;
 
   final requests = <MockPortalRequestObject>[];
+  final usedTokens = <String>{};
 
   late final Map<String, Map<String, DBusValue>> notifications;
   final Map<String, List<String>> proxies;
@@ -216,10 +224,22 @@ class MockPortalServer extends DBusClient {
     await registerObject(_root);
   }
 
-  Future<MockPortalRequestObject> addRequest() async {
-    var object = MockPortalRequestObject(this, '${requests.length}');
+  Future<MockPortalRequestObject> addRequest(
+      String sender, String token) async {
+    var object = MockPortalRequestObject(this, sender, token);
     await registerObject(object);
     return object;
+  }
+
+  /// Generate a token for requests and sessions.
+  String generateToken() {
+    final random = Random();
+    String token;
+    do {
+      token = '${random.nextInt(1 << 32)}';
+    } while (usedTokens.contains(token));
+    usedTokens.add(token);
+    return token;
   }
 }
 
