@@ -14,6 +14,7 @@ class XdgPortalRequest {
         DBusRemoteObject(client._bus, name: client._object.name, path: path);
   }
 
+  /// Ends the user interaction with this request.
   Future<void> close() async {
     await _object.callMethod('org.freedesktop.impl.portal.Request', 'Close', [],
         replySignature: DBusSignature(''));
