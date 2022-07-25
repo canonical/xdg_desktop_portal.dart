@@ -90,6 +90,96 @@ class XdgEmailPortal {
   }
 }
 
+/// Network connectivity states.
+enum XdgNetworkConnectivity { local, limited, portal, full }
+
+class XdgNetworkStatus {
+  /// true if the network is available.
+  bool available;
+
+  /// true if the network is metered.
+  bool metered;
+
+  /// The network connectivity state.
+  XdgNetworkConnectivity connectivity;
+
+  XdgNetworkStatus(
+      {required this.available,
+      required this.metered,
+      required this.connectivity});
+
+  @override
+  int get hashCode => Object.hash(available, metered, connectivity);
+
+  @override
+  bool operator ==(other) =>
+      other is XdgNetworkStatus &&
+      other.available == available &&
+      other.metered == metered &&
+      other.connectivity == connectivity;
+
+  @override
+  String toString() =>
+      '$runtimeType(available: $available, metered: $metered, connectivity: $connectivity)';
+}
+
+/// Portal to monitor networking.
+class XdgNetworkMonitorPortal {
+  /// The client that is connected to this portal.
+  XdgDesktopPortalClient client;
+
+  /// Stream of events when the status changes.
+  Stream<void> get changed => DBusRemoteObjectSignalStream(
+          object: client._object,
+          interface: 'org.freedesktop.portal.NetworkMonitor',
+          name: 'changed',
+          signature: DBusSignature(''))
+      .map((signal) {});
+
+  XdgNetworkMonitorPortal(this.client);
+
+  /// Get the current status of the network.
+  Future<XdgNetworkStatus> getStatus() async {
+    var result = await client._object.callMethod(
+        'org.freedesktop.portal.NetworkMonitor', 'GetStatus', [],
+        replySignature: DBusSignature('a{sv}'));
+    var options = result.returnValues[0].asStringVariantDict();
+    var available = false;
+    var availableValue = options['available'];
+    if (availableValue != null && availableValue is DBusBoolean) {
+      available = availableValue.asBoolean();
+    }
+    var metered = false;
+    var meteredValue = options['metered'];
+    if (meteredValue != null && meteredValue is DBusBoolean) {
+      metered = meteredValue.asBoolean();
+    }
+    var connectivity = XdgNetworkConnectivity.full;
+    var connectivityValue = options['connectivity'];
+    if (connectivityValue != null && connectivityValue is DBusUint32) {
+      connectivity = {
+            0: XdgNetworkConnectivity.local,
+            1: XdgNetworkConnectivity.limited,
+            2: XdgNetworkConnectivity.portal,
+            3: XdgNetworkConnectivity.full
+          }[connectivityValue.asUint32()] ??
+          XdgNetworkConnectivity.full;
+    }
+    return XdgNetworkStatus(
+        available: available, metered: metered, connectivity: connectivity);
+  }
+
+  /// Returns true if the given [hostname]:[port] is believed to be reachable.
+  Future<bool> canReach(String hostname, int port) async {
+    var result = await client._object.callMethod(
+        'org.freedesktop.portal.NetworkMonitor',
+        'CanReach',
+        [DBusString(hostname), DBusUint32(port)],
+        replySignature: DBusSignature('b'));
+    return result.returnValues[0].asBoolean();
+  }
+}
+
 /// Priorities for notifications.
 enum XdgNotificationPriority { low, normal, high, urgent }
 
@@ -493,6 +583,9 @@ class XdgDesktopPortalClient {
   /// Portal to get location information.
   late final XdgLocationPortal location;
 
+  /// Portal to monitor networking.
+  late final XdgNetworkMonitorPortal networkMonitor;
+
   /// Portal to create notifications.
   late final XdgNotificationPortal notification;
 
@@ -527,6 +620,7 @@ class XdgDesktopPortalClient {
     });
     email = XdgEmailPortal(this);
     location = XdgLocationPortal(this);
+    networkMonitor = XdgNetworkMonitorPortal(this);
     notification = XdgNotificationPortal(this);
     openUri = XdgOpenUriPortal(this);
     proxyResolver = XdgProxyResolverPortal(this);
