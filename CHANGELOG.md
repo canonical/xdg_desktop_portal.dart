@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.3
+
+* Added location portal.
+* Add missing documentation.
+
 ## 0.1.2
 
 * Added proxy resolver, open URI and email portals.
