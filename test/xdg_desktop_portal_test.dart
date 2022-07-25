@@ -227,13 +227,6 @@ class MockPortalServer extends DBusClient {
     await registerObject(_root);
   }
 
-  Future<MockPortalRequestObject> addRequest(
-      String sender, String token) async {
-    var object = MockPortalRequestObject(this, sender, token);
-    await registerObject(object);
-    return object;
-  }
-
   /// Generate a token for requests and sessions.
   String generateToken() {
     final random = Random();
@@ -243,6 +236,13 @@ class MockPortalServer extends DBusClient {
     } while (usedTokens.contains(token));
     usedTokens.add(token);
     return token;
+  }
+
+  Future<MockPortalRequestObject> addRequest(
+      String sender, String token) async {
+    var object = MockPortalRequestObject(this, sender, token);
+    await registerObject(object);
+    return object;
   }
 }
 
