@@ -112,6 +112,8 @@ class MockPortalObject extends DBusObject {
         return handleEmailMethodCall(methodCall);
       case 'org.freedesktop.portal.Location':
         return handleLocationMethodCall(methodCall);
+      case 'org.freedesktop.portal.NetworkMonitor':
+        return handleNetworkMonitorMethodCall(methodCall);
       case 'org.freedesktop.portal.Notification':
         return handleNotificationMethodCall(methodCall);
       case 'org.freedesktop.portal.OpenURI':
@@ -190,6 +192,28 @@ class MockPortalObject extends DBusObject {
         await emitSignal('org.freedesktop.portal.Location', 'LocationUpdated',
             [path, DBusDict.stringVariant(location)]);
         return DBusMethodSuccessResponse([request.path]);
+      default:
+        return DBusMethodErrorResponse.unknownMethod();
+    }
+  }
+
+  Future<DBusMethodResponse> handleNetworkMonitorMethodCall(
+      DBusMethodCall methodCall) async {
+    switch (methodCall.name) {
+      case 'GetStatus':
+        var status = <String, DBusValue>{};
+        status['available'] = DBusBoolean(server.networkAvailable);
+        status['metered'] = DBusBoolean(server.networkMetered);
+        status['connectivity'] = DBusUint32(server.networkConnectivity);
+        return DBusMethodSuccessResponse([DBusDict.stringVariant(status)]);
+      case 'CanReach':
+        var hostname = methodCall.values[0].asString();
+        var port = methodCall.values[1].asUint32();
+        var canReach = true;
+        if (hostname == 'unreachable.com' && port == 99) {
+          canReach = false;
+        }
+        return DBusMethodSuccessResponse([DBusBoolean(canReach)]);
       default:
         return DBusMethodErrorResponse.unknownMethod();
     }
@@ -291,6 +315,9 @@ class MockPortalServer extends DBusClient {
   final double? speed;
   final double? heading;
   final int? locationTimestamp;
+  bool networkAvailable;
+  bool networkMetered;
+  int networkConnectivity;
 
   String? lastParentWindow;
   final composedEmails = <MockEmail>[];
@@ -306,7 +333,10 @@ class MockPortalServer extends DBusClient {
       this.accuracy,
       this.speed,
       this.heading,
-      this.locationTimestamp})
+      this.locationTimestamp,
+      this.networkAvailable = true,
+      this.networkMetered = false,
+      this.networkConnectivity = 3})
       : super(clientAddress) {
     _root = MockPortalObject(this);
     this.notifications = notifications ?? {};
@@ -315,6 +345,20 @@ class MockPortalServer extends DBusClient {
   Future<void> start() async {
     await requestName('org.freedesktop.portal.Desktop');
     await registerObject(_root);
+  }
+
+  Future<void> setNetworkStatus(
+      {bool? available, bool? metered, int? connectivity}) async {
+    if (available != null) {
+      networkAvailable = available;
+    }
+    if (metered != null) {
+      networkMetered = metered;
+    }
+    if (connectivity != null) {
+      networkConnectivity = connectivity;
+    }
+    await _root.emitSignal('org.freedesktop.portal.NetworkMonitor', 'changed');
   }
 
   /// Generate a token for requests and sessions.
@@ -426,6 +470,95 @@ void main() {
                 DateTime.fromMicrosecondsSinceEpoch(1658718568000000))))));
     await session.start(parentWindow: 'x11:12345');
     expect(portalServer.lastParentWindow, equals('x11:12345'));
+  });
+
+  test('network monitor - status', () async {
+    var server = DBusServer();
+    var clientAddress =
+        await server.listenAddress(DBusAddress.unix(dir: Directory.systemTemp));
+    addTearDown(() async {
+      await server.close();
+    });
+
+    var portalServer = MockPortalServer(clientAddress,
+        networkAvailable: true, networkMetered: true, networkConnectivity: 2);
+    await portalServer.start();
+    addTearDown(() async {
+      await portalServer.close();
+    });
+
+    var client = XdgDesktopPortalClient(bus: DBusClient(clientAddress));
+    addTearDown(() async {
+      await client.close();
+    });
+
+    expect(
+        await client.networkMonitor.getStatus(),
+        equals(XdgNetworkStatus(
+            available: true,
+            metered: true,
+            connectivity: XdgNetworkConnectivity.portal)));
+  });
+
+  test('network monitor - status changed', () async {
+    var server = DBusServer();
+    var clientAddress =
+        await server.listenAddress(DBusAddress.unix(dir: Directory.systemTemp));
+    addTearDown(() async {
+      await server.close();
+    });
+
+    var portalServer = MockPortalServer(clientAddress,
+        networkAvailable: true, networkMetered: true, networkConnectivity: 0);
+    await portalServer.start();
+    addTearDown(() async {
+      await portalServer.close();
+    });
+
+    var client = XdgDesktopPortalClient(bus: DBusClient(clientAddress));
+    addTearDown(() async {
+      await client.close();
+    });
+
+    client.networkMonitor.changed.listen(expectAsync1((value) {}));
+    expect(
+        await client.networkMonitor.getStatus(),
+        equals(XdgNetworkStatus(
+            available: true,
+            metered: true,
+            connectivity: XdgNetworkConnectivity.local)));
+    await portalServer.setNetworkStatus(
+        available: false, metered: false, connectivity: 3);
+    expect(
+        await client.networkMonitor.getStatus(),
+        equals(XdgNetworkStatus(
+            available: false,
+            metered: false,
+            connectivity: XdgNetworkConnectivity.full)));
+  });
+
+  test('network monitor - can reach', () async {
+    var server = DBusServer();
+    var clientAddress =
+        await server.listenAddress(DBusAddress.unix(dir: Directory.systemTemp));
+    addTearDown(() async {
+      await server.close();
+    });
+
+    var portalServer = MockPortalServer(clientAddress);
+    await portalServer.start();
+    addTearDown(() async {
+      await portalServer.close();
+    });
+
+    var client = XdgDesktopPortalClient(bus: DBusClient(clientAddress));
+    addTearDown(() async {
+      await client.close();
+    });
+
+    expect(await client.networkMonitor.canReach('example.com', 80), isTrue);
+    expect(
+        await client.networkMonitor.canReach('unreachable.com', 99), isFalse);
   });
 
   test('add notification', () async {
