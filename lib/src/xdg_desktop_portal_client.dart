@@ -6,6 +6,7 @@ import 'package:dbus/dbus.dart';
 import 'xdg_account_portal.dart';
 import 'xdg_background_portal.dart';
 import 'xdg_camera_portal.dart';
+import 'xdg_documents_portal.dart';
 import 'xdg_email_portal.dart';
 import 'xdg_file_chooser_portal.dart';
 import 'xdg_network_monitor_portal.dart';
@@ -22,7 +23,8 @@ class XdgDesktopPortalClient {
   final DBusClient _bus;
   final bool _closeBus;
 
-  late final DBusRemoteObject _object;
+  late final DBusRemoteObject _desktopObject;
+  late final DBusRemoteObject _documentsObject;
 
   /// Portal for obtaining information about the user.
   late final XdgAccountPortal account;
@@ -32,6 +34,9 @@ class XdgDesktopPortalClient {
 
   /// Camera portal.
   late final XdgCameraPortal camera;
+
+  /// Portal to access documents.
+  late final XdgDocumentsPortal documents;
 
   /// Portal to send email.
   late final XdgEmailPortal email;
@@ -67,21 +72,25 @@ class XdgDesktopPortalClient {
   XdgDesktopPortalClient({DBusClient? bus})
       : _bus = bus ?? DBusClient.session(),
         _closeBus = bus == null {
-    _object = DBusRemoteObject(_bus,
+    _desktopObject = DBusRemoteObject(_bus,
         name: 'org.freedesktop.portal.Desktop',
         path: DBusObjectPath('/org/freedesktop/portal/desktop'));
-    account = XdgAccountPortal(_object, _generateToken);
-    background = XdgBackgroundPortal(_object, _generateToken);
-    camera = XdgCameraPortal(_object, _generateToken);
-    email = XdgEmailPortal(_object, _generateToken);
-    fileChooser = XdgFileChooserPortal(_object, _generateToken);
-    location = XdgLocationPortal(_object, _generateToken);
-    networkMonitor = XdgNetworkMonitorPortal(_object);
-    notification = XdgNotificationPortal(_object);
-    openUri = XdgOpenUriPortal(_object, _generateToken);
-    proxyResolver = XdgProxyResolverPortal(_object);
-    secret = XdgSecretPortal(_object, _generateToken);
-    settings = XdgSettingsPortal(_object);
+    _documentsObject = DBusRemoteObject(_bus,
+        name: 'org.freedesktop.portal.Documents',
+        path: DBusObjectPath('/org/freedesktop/portal/documents'));
+    account = XdgAccountPortal(_desktopObject, _generateToken);
+    background = XdgBackgroundPortal(_desktopObject, _generateToken);
+    camera = XdgCameraPortal(_desktopObject, _generateToken);
+    documents = XdgDocumentsPortal(_documentsObject);
+    email = XdgEmailPortal(_desktopObject, _generateToken);
+    fileChooser = XdgFileChooserPortal(_desktopObject, _generateToken);
+    location = XdgLocationPortal(_desktopObject, _generateToken);
+    networkMonitor = XdgNetworkMonitorPortal(_desktopObject);
+    notification = XdgNotificationPortal(_desktopObject);
+    openUri = XdgOpenUriPortal(_desktopObject, _generateToken);
+    proxyResolver = XdgProxyResolverPortal(_desktopObject);
+    secret = XdgSecretPortal(_desktopObject, _generateToken);
+    settings = XdgSettingsPortal(_desktopObject);
   }
 
   /// Terminates all active connections. If a client remains unclosed, the Dart process may not terminate.
