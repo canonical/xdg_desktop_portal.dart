@@ -4,5 +4,8 @@ void main(List<String> args) async {
   var client = XdgDesktopPortalClient();
   var session = await client.location.createSession();
   session.locationUpdated.listen((location) => print(location));
-  await session.start();
+  var request = await session.start();
+  if (await request.response != XdgPortalResponse.success) {
+    print('Failed to get location');
+  }
 }

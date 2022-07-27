@@ -8,6 +8,10 @@ class XdgPortalRequest {
   /// The client that is connected to this portal.
   XdgDesktopPortalClient client;
 
+  /// The result of this request.
+  Future<XdgPortalResponse> get response => _response.future;
+  final _response = Completer<XdgPortalResponse>();
+
   late final DBusRemoteObject _object;
 
   XdgPortalRequest(this.client, DBusObjectPath path) {
@@ -17,10 +21,18 @@ class XdgPortalRequest {
 
   /// Ends the user interaction with this request.
   Future<void> close() async {
-    await _object.callMethod('org.freedesktop.impl.portal.Request', 'Close', [],
+    await _object.callMethod('org.freedesktop.portal.Request', 'Close', [],
         replySignature: DBusSignature(''));
   }
+
+  void _handleResponse(
+      XdgPortalResponse response, Map<String, DBusValue> result) {
+    _response.complete(response);
+  }
 }
+
+/// Response from a portal request.
+enum XdgPortalResponse { success, cancelled, other }
 
 /// A session opened on a portal.
 class XdgPortalSession {
@@ -28,10 +40,10 @@ class XdgPortalSession {
   XdgDesktopPortalClient client;
 
   /// true when this session has been closed by the portal.
-  final _closedCompleter = Completer<bool>();
   Future<bool> get closed => _closedCompleter.future;
 
   late final DBusRemoteObject _object;
+  final _closedCompleter = Completer<bool>();
 
   XdgPortalSession(this.client, DBusObjectPath path) {
     _object =
@@ -40,7 +52,7 @@ class XdgPortalSession {
 
   /// Close the session.
   Future<void> close() async {
-    await _object.callMethod('org.freedesktop.impl.portal.Session', 'Close', [],
+    await _object.callMethod('org.freedesktop.portal.Session', 'Close', [],
         replySignature: DBusSignature(''));
   }
 }
@@ -86,7 +98,10 @@ class XdgEmailPortal {
         'ComposeEmail',
         [DBusString(parentWindow), DBusDict.stringVariant(options)],
         replySignature: DBusSignature('o'));
-    return XdgPortalRequest(client, result.returnValues[0].asObjectPath());
+    var request =
+        XdgPortalRequest(client, result.returnValues[0].asObjectPath());
+    client._addRequest(request);
+    return request;
   }
 }
 
@@ -383,7 +398,9 @@ class XdgLocationSession extends XdgPortalSession {
         ],
         replySignature: DBusSignature('o'));
     var handle = result.returnValues[0].asObjectPath();
-    return XdgPortalRequest(client, handle);
+    var request = XdgPortalRequest(client, handle);
+    client._addRequest(request);
+    return request;
   }
 }
 
@@ -509,7 +526,10 @@ class XdgOpenUriPortal {
           DBusDict.stringVariant(options)
         ],
         replySignature: DBusSignature('o'));
-    return XdgPortalRequest(client, result.returnValues[0].asObjectPath());
+    var request =
+        XdgPortalRequest(client, result.returnValues[0].asObjectPath());
+    client._addRequest(request);
+    return request;
   }
 
   // FIXME: OpenFile
@@ -573,8 +593,10 @@ class XdgDesktopPortalClient {
 
   late final DBusRemoteObject _object;
 
+  late final StreamSubscription _requestResponseSubscription;
   late final StreamSubscription _sessionClosedSubscription;
 
+  final _requests = <DBusObjectPath, XdgPortalRequest>{};
   final _sessions = <DBusObjectPath, XdgPortalSession>{};
 
   /// Portal to send email.
@@ -608,12 +630,29 @@ class XdgDesktopPortalClient {
     _object = DBusRemoteObject(_bus,
         name: 'org.freedesktop.portal.Desktop',
         path: DBusObjectPath('/org/freedesktop/portal/desktop'));
+    var requestResponse = DBusSignalStream(_bus,
+        interface: 'org.freedesktop.portal.Request',
+        name: 'Response',
+        signature: DBusSignature('ua{sv}'));
+    _requestResponseSubscription = requestResponse.listen((signal) {
+      var request = _requests.remove(signal.path);
+      if (request != null) {
+        request._handleResponse(
+            {
+                  0: XdgPortalResponse.success,
+                  1: XdgPortalResponse.cancelled,
+                  2: XdgPortalResponse.other
+                }[signal.values[0].asUint32()] ??
+                XdgPortalResponse.other,
+            signal.values[1].asStringVariantDict());
+      }
+    });
     var sessionClosed = DBusSignalStream(_bus,
-        interface: 'org.freedesktop.impl.portal.Session',
+        interface: 'org.freedesktop.portal.Session',
         name: 'Closed',
         signature: DBusSignature(''));
     _sessionClosedSubscription = sessionClosed.listen((signal) {
-      var session = _sessions[signal.path];
+      var session = _sessions.remove(signal.path);
       if (session != null) {
         session._closedCompleter.complete(true);
       }
@@ -629,6 +668,7 @@ class XdgDesktopPortalClient {
 
   /// Terminates all active connections. If a client remains unclosed, the Dart process may not terminate.
   Future<void> close() async {
+    await _requestResponseSubscription.cancel();
     await _sessionClosedSubscription.cancel();
     await location._close();
     if (_closeBus) {
@@ -647,9 +687,13 @@ class XdgDesktopPortalClient {
     return token;
   }
 
+  /// Record an active portal request.
+  void _addRequest(XdgPortalRequest request) {
+    _requests[request._object.path] = request;
+  }
+
   /// Record an active portal session.
-  XdgPortalSession _addSession(XdgPortalSession session) {
+  void _addSession(XdgPortalSession session) {
     _sessions[session._object.path] = session;
-    return session;
   }
 }
