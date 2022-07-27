@@ -56,7 +56,6 @@ class MockUri {
 
 class MockPortalRequestObject extends DBusObject {
   final MockPortalServer server;
-  var closed = false;
 
   MockPortalRequestObject(this.server, String sender, String token)
       : super(DBusObjectPath(
@@ -64,34 +63,41 @@ class MockPortalRequestObject extends DBusObject {
 
   @override
   Future<DBusMethodResponse> handleMethodCall(DBusMethodCall methodCall) async {
-    if (methodCall.interface != 'org.freedesktop.impl.portal.Request') {
+    if (methodCall.interface != 'org.freedesktop.portal.Request') {
       return DBusMethodErrorResponse.unknownInterface();
     }
 
     if (methodCall.name == 'Close') {
-      closed = true;
+      await server.unregisterObject(this);
       return DBusMethodSuccessResponse();
     } else {
       return DBusMethodErrorResponse.unknownMethod();
     }
   }
+
+  Future<void> respond(
+      {int response = 0, Map<String, DBusValue> result = const {}}) async {
+    await emitSignal('org.freedesktop.portal.Request', 'Response',
+        [DBusUint32(response), DBusDict.stringVariant(result)]);
+    await server.unregisterObject(this);
+  }
 }
 
 class MockPortalSessionObject extends DBusObject {
   final MockPortalServer server;
-  var closed = false;
 
   MockPortalSessionObject(this.server, String token)
       : super(DBusObjectPath('/org/freedesktop/portal/desktop/session/$token'));
 
   @override
   Future<DBusMethodResponse> handleMethodCall(DBusMethodCall methodCall) async {
-    if (methodCall.interface != 'org.freedesktop.impl.portal.Session') {
+    if (methodCall.interface != 'org.freedesktop.portal.Session') {
       return DBusMethodErrorResponse.unknownInterface();
     }
 
     if (methodCall.name == 'Close') {
-      closed = true;
+      await emitSignal('org.freedesktop.portal.Session', 'Closed');
+      await server.unregisterObject(this);
       return DBusMethodSuccessResponse();
     } else {
       return DBusMethodErrorResponse.unknownMethod();
@@ -139,6 +145,7 @@ class MockPortalObject extends DBusObject {
             options['handle_token']?.asString() ?? server.generateToken();
         options.removeWhere((key, value) => key == 'handle_token');
         var request = await server.addRequest(methodCall.sender, token);
+        Future.delayed(Duration.zero, () async => await request.respond());
         return DBusMethodSuccessResponse([request.path]);
       default:
         return DBusMethodErrorResponse.unknownMethod();
@@ -164,6 +171,7 @@ class MockPortalObject extends DBusObject {
         var token =
             options['handle_token']?.asString() ?? server.generateToken();
         var request = await server.addRequest(methodCall.sender, token);
+        Future.delayed(Duration.zero, () async => await request.respond());
         var location = <String, DBusValue>{};
         if (server.latitude != null) {
           location['Latitude'] = DBusDouble(server.latitude!);
@@ -249,6 +257,7 @@ class MockPortalObject extends DBusObject {
         server.lastParentWindow = parentWindow;
         server.openedUris.add(MockUri(uri, options));
         var request = await server.addRequest(methodCall.sender, token);
+        Future.delayed(Duration.zero, () async => await request.respond());
         return DBusMethodSuccessResponse([request.path]);
       default:
         return DBusMethodErrorResponse.unknownMethod();
@@ -406,7 +415,7 @@ void main() {
       await client.close();
     });
 
-    await client.email.composeEmail(
+    var request = await client.email.composeEmail(
         parentWindow: 'x11:12345',
         address: 'alice@example.com',
         addresses: ['bob@example.com', 'carol@example.com'],
@@ -414,6 +423,7 @@ void main() {
         bcc: ['elle@example.com'],
         subject: 'Great Opportunity',
         body: 'Would you like to buy some encyclopedias?');
+    expect(await request.response, equals(XdgPortalResponse.success));
     expect(portalServer.lastParentWindow, equals('x11:12345'));
     expect(
         portalServer.composedEmails,
@@ -468,7 +478,8 @@ void main() {
             heading: 321.4,
             timestamp:
                 DateTime.fromMicrosecondsSinceEpoch(1658718568000000))))));
-    await session.start(parentWindow: 'x11:12345');
+    var request = await session.start(parentWindow: 'x11:12345');
+    expect(await request.response, equals(XdgPortalResponse.success));
     expect(portalServer.lastParentWindow, equals('x11:12345'));
   });
 
@@ -795,11 +806,12 @@ void main() {
       await client.close();
     });
 
-    await client.openUri.openUri('http://example.com',
+    var request = await client.openUri.openUri('http://example.com',
         parentWindow: 'x11:12345',
         writable: true,
         ask: true,
         activationToken: 'token');
+    expect(await request.response, equals(XdgPortalResponse.success));
     expect(portalServer.lastParentWindow, equals('x11:12345'));
     expect(
         portalServer.openedUris,

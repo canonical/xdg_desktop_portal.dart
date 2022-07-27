@@ -8,7 +8,10 @@ void main(List<String> args) async {
   var uri = args[0];
 
   var client = XdgDesktopPortalClient();
-  await client.openUri.openUri(uri);
+  var request = await client.openUri.openUri(uri);
+  if (await request.response != XdgPortalResponse.success) {
+    print('Failed to open URI');
+  }
 
   await client.close();
 }
