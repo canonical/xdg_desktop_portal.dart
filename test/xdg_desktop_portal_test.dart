@@ -466,21 +466,21 @@ void main() {
       await client.close();
     });
 
-    var session = await client.location.createSession();
-    session.locationUpdated.listen(expectAsync1((location) => expect(
-        location,
-        equals(XdgLocation(
-            latitude: 40.9,
-            longitude: 174.9,
-            altitude: 42.0,
-            accuracy: 1.2,
-            speed: 28.0,
-            heading: 321.4,
-            timestamp:
-                DateTime.fromMicrosecondsSinceEpoch(1658718568000000))))));
-    var request = await session.start(parentWindow: 'x11:12345');
-    expect(await request.response, equals(XdgPortalResponse.success));
-    expect(portalServer.lastParentWindow, equals('x11:12345'));
+    var locations = client.location.createSession(parentWindow: 'x11:12345');
+    locations.listen(expectAsync1((location) {
+      expect(
+          location,
+          equals(XdgLocation(
+              latitude: 40.9,
+              longitude: 174.9,
+              altitude: 42.0,
+              accuracy: 1.2,
+              speed: 28.0,
+              heading: 321.4,
+              timestamp:
+                  DateTime.fromMicrosecondsSinceEpoch(1658718568000000))));
+      expect(portalServer.lastParentWindow, equals('x11:12345'));
+    }));
   });
 
   test('network monitor - status', () async {
