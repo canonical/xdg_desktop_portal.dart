@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.4
+
+* Fix handling of requests and sessions.
+* Added NetworkMonitor portal.
+
 ## 0.1.3
 
 * Added location portal.
