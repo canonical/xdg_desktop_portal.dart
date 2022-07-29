@@ -35,7 +35,7 @@ class XdgPortalRequest {
 enum XdgPortalResponse { success, cancelled, other }
 
 /// A session opened on a portal.
-class XdgPortalSession {
+class _XdgPortalSession {
   /// The client that is connected to this portal.
   XdgDesktopPortalClient client;
 
@@ -45,7 +45,7 @@ class XdgPortalSession {
   late final DBusRemoteObject _object;
   final _closedCompleter = Completer<bool>();
 
-  XdgPortalSession(this.client, DBusObjectPath path) {
+  _XdgPortalSession(this.client, DBusObjectPath path) {
     _object =
         DBusRemoteObject(client._bus, name: client._object.name, path: path);
   }
@@ -376,13 +376,11 @@ class XdgLocation {
 }
 
 /// A location session.
-class XdgLocationSession extends XdgPortalSession {
-  final _locationUpdated = StreamController<XdgLocation>();
+class _XdgLocationSession extends _XdgPortalSession {
+  final StreamController<XdgLocation> controller;
 
-  /// Stream of location updates from the portal.
-  Stream<XdgLocation> get locationUpdated => _locationUpdated.stream;
-
-  XdgLocationSession(XdgDesktopPortalClient client, DBusObjectPath path)
+  _XdgLocationSession(
+      XdgDesktopPortalClient client, DBusObjectPath path, this.controller)
       : super(client, path);
 
   /// Start this session.
@@ -404,6 +402,79 @@ class XdgLocationSession extends XdgPortalSession {
   }
 }
 
+/// Provides a stream of locations using the portal APIs.
+class _LocationStreamController {
+  final XdgDesktopPortalClient client;
+  late final StreamController<XdgLocation> controller;
+
+  final int? distanceThreshold;
+  final int? timeThreshold;
+  final XdgLocationAccuracy? accuracy;
+  final String parentWindow;
+
+  _XdgLocationSession? session;
+
+  /// Locations received from the portal.
+  Stream<XdgLocation> get stream => controller.stream;
+
+  _LocationStreamController(
+      {required this.client,
+      this.distanceThreshold,
+      this.timeThreshold,
+      this.accuracy,
+      this.parentWindow = ''}) {
+    controller =
+        StreamController<XdgLocation>(onListen: _onListen, onCancel: _onCancel);
+  }
+
+  Future<void> _onListen() async {
+    var options = <String, DBusValue>{};
+    options['session_handle_token'] = DBusString(client._generateToken());
+    if (distanceThreshold != null) {
+      options['distance-threshold'] = DBusUint32(distanceThreshold!);
+    }
+    if (timeThreshold != null) {
+      options['time-threshold'] = DBusUint32(timeThreshold!);
+    }
+    if (accuracy != null) {
+      options['accuracy'] = DBusUint32({
+            XdgLocationAccuracy.none: 0,
+            XdgLocationAccuracy.country: 1,
+            XdgLocationAccuracy.city: 2,
+            XdgLocationAccuracy.neighborhood: 3,
+            XdgLocationAccuracy.street: 4,
+            XdgLocationAccuracy.exact: 5
+          }[accuracy!] ??
+          5);
+    }
+    var createResult = await client._object.callMethod(
+        'org.freedesktop.portal.Location',
+        'CreateSession',
+        [DBusDict.stringVariant(options)],
+        replySignature: DBusSignature('o'));
+    session = _XdgLocationSession(
+        client, createResult.returnValues[0].asObjectPath(), controller);
+    client._addSession(session!);
+
+    var startRequest = await session!.start(parentWindow: parentWindow);
+    switch (await startRequest.response) {
+      case XdgPortalResponse.success:
+        break;
+      case XdgPortalResponse.cancelled:
+        controller.addError('Request was cancelled');
+        break;
+      case XdgPortalResponse.other:
+      default:
+        controller.addError('Location session start failed');
+        break;
+    }
+  }
+
+  Future<void> _onCancel() async {
+    await session?.close();
+  }
+}
+
 /// Portal to get location information.
 class XdgLocationPortal {
   /// The client that is connected to this portal.
@@ -420,7 +491,7 @@ class XdgLocationPortal {
     _locationUpdatedSubscription = locationUpdated.listen((signal) {
       var path = signal.values[0].asObjectPath();
       var session = client._sessions[path];
-      if (session == null || session is! XdgLocationSession) {
+      if (session == null || session is! _XdgLocationSession) {
         return;
       }
       var location = signal.values[1].asStringVariantDict();
@@ -442,7 +513,7 @@ class XdgLocationPortal {
         timestamp = DateTime.fromMicrosecondsSinceEpoch(s * 1000000 + us);
       }
 
-      session._locationUpdated.add(XdgLocation(
+      session.controller.add(XdgLocation(
           latitude: getLocationValue('Latitude'),
           longitude: getLocationValue('Longitude'),
           altitude: getLocationValue('Altitude'),
@@ -453,39 +524,20 @@ class XdgLocationPortal {
     });
   }
 
-  /// Create a location session.
-  Future<XdgLocationSession> createSession(
+  /// Create a location session that returns a stream of location updates from the portal.
+  /// When the session is no longer required close the stream.
+  Stream<XdgLocation> createSession(
       {int? distanceThreshold,
       int? timeThreshold,
-      XdgLocationAccuracy? accuracy}) async {
-    var options = <String, DBusValue>{};
-    options['session_handle_token'] = DBusString(client._generateToken());
-    if (distanceThreshold != null) {
-      options['distance-threshold'] = DBusUint32(distanceThreshold);
-    }
-    if (timeThreshold != null) {
-      options['time-threshold'] = DBusUint32(timeThreshold);
-    }
-    if (accuracy != null) {
-      options['accuracy'] = DBusUint32({
-            XdgLocationAccuracy.none: 0,
-            XdgLocationAccuracy.country: 1,
-            XdgLocationAccuracy.city: 2,
-            XdgLocationAccuracy.neighborhood: 3,
-            XdgLocationAccuracy.street: 4,
-            XdgLocationAccuracy.exact: 5
-          }[accuracy] ??
-          5);
-    }
-    var result = await client._object.callMethod(
-        'org.freedesktop.portal.Location',
-        'CreateSession',
-        [DBusDict.stringVariant(options)],
-        replySignature: DBusSignature('o'));
-    var session =
-        XdgLocationSession(client, result.returnValues[0].asObjectPath());
-    client._addSession(session);
-    return session;
+      XdgLocationAccuracy? accuracy,
+      String parentWindow = ''}) {
+    var controller = _LocationStreamController(
+        client: client,
+        distanceThreshold: distanceThreshold,
+        timeThreshold: timeThreshold,
+        accuracy: accuracy,
+        parentWindow: parentWindow);
+    return controller.stream;
   }
 
   Future<void> _close() async {
@@ -597,7 +649,7 @@ class XdgDesktopPortalClient {
   late final StreamSubscription _sessionClosedSubscription;
 
   final _requests = <DBusObjectPath, XdgPortalRequest>{};
-  final _sessions = <DBusObjectPath, XdgPortalSession>{};
+  final _sessions = <DBusObjectPath, _XdgPortalSession>{};
 
   /// Portal to send email.
   late final XdgEmailPortal email;
@@ -693,7 +745,7 @@ class XdgDesktopPortalClient {
   }
 
   /// Record an active portal session.
-  void _addSession(XdgPortalSession session) {
+  void _addSession(_XdgPortalSession session) {
     _sessions[session._object.path] = session;
   }
 }
