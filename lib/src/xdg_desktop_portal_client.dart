@@ -3,18 +3,30 @@ import 'dart:math';
 import 'dart:typed_data';
 import 'package:dbus/dbus.dart';
 
+/// Exception thrown when a portal request fails due to it being cancelled.
+class XdgPortalRequestCancelledException implements Exception {
+  @override
+  String toString() => 'Request was cancelled';
+}
+
+/// Exception thrown when a portal request fails.
+class XdgPortalRequestFailedException implements Exception {
+  @override
+  String toString() => 'Request failed';
+}
+
 /// A request sent to a portal.
-class XdgPortalRequest {
+class _XdgPortalRequest {
   /// The client that is connected to this portal.
   XdgDesktopPortalClient client;
 
   /// The result of this request.
-  Future<XdgPortalResponse> get response => _response.future;
-  final _response = Completer<XdgPortalResponse>();
+  Future<_XdgPortalResponse> get response => _response.future;
+  final _response = Completer<_XdgPortalResponse>();
 
   late final DBusRemoteObject _object;
 
-  XdgPortalRequest(this.client, DBusObjectPath path) {
+  _XdgPortalRequest(this.client, DBusObjectPath path) {
     _object =
         DBusRemoteObject(client._bus, name: client._object.name, path: path);
   }
@@ -26,13 +38,13 @@ class XdgPortalRequest {
   }
 
   void _handleResponse(
-      XdgPortalResponse response, Map<String, DBusValue> result) {
+      _XdgPortalResponse response, Map<String, DBusValue> result) {
     _response.complete(response);
   }
 }
 
 /// Response from a portal request.
-enum XdgPortalResponse { success, cancelled, other }
+enum _XdgPortalResponse { success, cancelled, other }
 
 /// A session opened on a portal.
 class _XdgPortalSession {
@@ -65,7 +77,7 @@ class XdgEmailPortal {
   XdgEmailPortal(this.client);
 
   /// Present a window to compose an email.
-  Future<XdgPortalRequest> composeEmail(
+  Future<void> composeEmail(
       {String parentWindow = '',
       String? address,
       Iterable<String> addresses = const [],
@@ -99,9 +111,17 @@ class XdgEmailPortal {
         [DBusString(parentWindow), DBusDict.stringVariant(options)],
         replySignature: DBusSignature('o'));
     var request =
-        XdgPortalRequest(client, result.returnValues[0].asObjectPath());
+        _XdgPortalRequest(client, result.returnValues[0].asObjectPath());
     client._addRequest(request);
-    return request;
+    switch (await request.response) {
+      case _XdgPortalResponse.success:
+        break;
+      case _XdgPortalResponse.cancelled:
+        throw XdgPortalRequestCancelledException();
+      case _XdgPortalResponse.other:
+      default:
+        throw XdgPortalRequestFailedException();
+    }
   }
 }
 
@@ -384,7 +404,7 @@ class _XdgLocationSession extends _XdgPortalSession {
       : super(client, path);
 
   /// Start this session.
-  Future<XdgPortalRequest> start({String parentWindow = ''}) async {
+  Future<_XdgPortalRequest> start({String parentWindow = ''}) async {
     var options = <String, DBusValue>{};
     var result = await client._object.callMethod(
         'org.freedesktop.portal.Location',
@@ -396,7 +416,7 @@ class _XdgLocationSession extends _XdgPortalSession {
         ],
         replySignature: DBusSignature('o'));
     var handle = result.returnValues[0].asObjectPath();
-    var request = XdgPortalRequest(client, handle);
+    var request = _XdgPortalRequest(client, handle);
     client._addRequest(request);
     return request;
   }
@@ -458,12 +478,12 @@ class _LocationStreamController {
 
     var startRequest = await session!.start(parentWindow: parentWindow);
     switch (await startRequest.response) {
-      case XdgPortalResponse.success:
+      case _XdgPortalResponse.success:
         break;
-      case XdgPortalResponse.cancelled:
+      case _XdgPortalResponse.cancelled:
         controller.addError('Request was cancelled');
         break;
-      case XdgPortalResponse.other:
+      case _XdgPortalResponse.other:
       default:
         controller.addError('Location session start failed');
         break;
@@ -553,7 +573,7 @@ class XdgOpenUriPortal {
   XdgOpenUriPortal(this.client);
 
   /// Ask to open a URI.
-  Future<XdgPortalRequest> openUri(String uri,
+  Future<void> openUri(String uri,
       {String parentWindow = '',
       bool? writable,
       bool? ask,
@@ -579,9 +599,17 @@ class XdgOpenUriPortal {
         ],
         replySignature: DBusSignature('o'));
     var request =
-        XdgPortalRequest(client, result.returnValues[0].asObjectPath());
+        _XdgPortalRequest(client, result.returnValues[0].asObjectPath());
     client._addRequest(request);
-    return request;
+    switch (await request.response) {
+      case _XdgPortalResponse.success:
+        break;
+      case _XdgPortalResponse.cancelled:
+        throw XdgPortalRequestCancelledException();
+      case _XdgPortalResponse.other:
+      default:
+        throw XdgPortalRequestFailedException();
+    }
   }
 
   // FIXME: OpenFile
@@ -648,7 +676,7 @@ class XdgDesktopPortalClient {
   late final StreamSubscription _requestResponseSubscription;
   late final StreamSubscription _sessionClosedSubscription;
 
-  final _requests = <DBusObjectPath, XdgPortalRequest>{};
+  final _requests = <DBusObjectPath, _XdgPortalRequest>{};
   final _sessions = <DBusObjectPath, _XdgPortalSession>{};
 
   /// Portal to send email.
@@ -691,11 +719,11 @@ class XdgDesktopPortalClient {
       if (request != null) {
         request._handleResponse(
             {
-                  0: XdgPortalResponse.success,
-                  1: XdgPortalResponse.cancelled,
-                  2: XdgPortalResponse.other
+                  0: _XdgPortalResponse.success,
+                  1: _XdgPortalResponse.cancelled,
+                  2: _XdgPortalResponse.other
                 }[signal.values[0].asUint32()] ??
-                XdgPortalResponse.other,
+                _XdgPortalResponse.other,
             signal.values[1].asStringVariantDict());
       }
     });
@@ -740,7 +768,7 @@ class XdgDesktopPortalClient {
   }
 
   /// Record an active portal request.
-  void _addRequest(XdgPortalRequest request) {
+  void _addRequest(_XdgPortalRequest request) {
     _requests[request._object.path] = request;
   }
 

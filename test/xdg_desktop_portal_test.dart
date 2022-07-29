@@ -415,7 +415,7 @@ void main() {
       await client.close();
     });
 
-    var request = await client.email.composeEmail(
+    await client.email.composeEmail(
         parentWindow: 'x11:12345',
         address: 'alice@example.com',
         addresses: ['bob@example.com', 'carol@example.com'],
@@ -423,7 +423,6 @@ void main() {
         bcc: ['elle@example.com'],
         subject: 'Great Opportunity',
         body: 'Would you like to buy some encyclopedias?');
-    expect(await request.response, equals(XdgPortalResponse.success));
     expect(portalServer.lastParentWindow, equals('x11:12345'));
     expect(
         portalServer.composedEmails,
@@ -806,12 +805,11 @@ void main() {
       await client.close();
     });
 
-    var request = await client.openUri.openUri('http://example.com',
+    await client.openUri.openUri('http://example.com',
         parentWindow: 'x11:12345',
         writable: true,
         ask: true,
         activationToken: 'token');
-    expect(await request.response, equals(XdgPortalResponse.success));
     expect(portalServer.lastParentWindow, equals('x11:12345'));
     expect(
         portalServer.openedUris,
