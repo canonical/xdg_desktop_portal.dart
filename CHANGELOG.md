@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.5
+
+* Hide request and session API, use exceptions and streams instead.
+
 ## 0.1.4
 
 * Fix handling of requests and sessions.
