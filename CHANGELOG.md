@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.6
+
+* Use a stream for network status.
+
 ## 0.1.5
 
 * Hide request and session API, use exceptions and streams instead.
