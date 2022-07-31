@@ -20,18 +20,13 @@ void main(List<String> args) async {
     }
 
     var client = XdgDesktopPortalClient();
-
-    Future<void> updateStatus() async {
-      var status = await client.networkMonitor.getStatus();
+    client.networkMonitor.getStatus().listen((status) {
       print('Available: ${status.available}');
       if (status.available) {
         print('Metered: ${status.metered}');
         print('Connectivity: ${status.connectivity}');
       }
-    }
-
-    client.networkMonitor.changed.listen((v) => updateStatus());
-    await updateStatus();
+    });
   } else if (action == 'can-reach') {
     if (args.length < 3) {
       usage();

@@ -491,60 +491,36 @@ void main() {
     });
 
     var portalServer = MockPortalServer(clientAddress,
-        networkAvailable: true, networkMetered: true, networkConnectivity: 2);
-    await portalServer.start();
-    addTearDown(() async {
-      await portalServer.close();
-    });
-
-    var client = XdgDesktopPortalClient(bus: DBusClient(clientAddress));
-    addTearDown(() async {
-      await client.close();
-    });
-
-    expect(
-        await client.networkMonitor.getStatus(),
-        equals(XdgNetworkStatus(
-            available: true,
-            metered: true,
-            connectivity: XdgNetworkConnectivity.portal)));
-  });
-
-  test('network monitor - status changed', () async {
-    var server = DBusServer();
-    var clientAddress =
-        await server.listenAddress(DBusAddress.unix(dir: Directory.systemTemp));
-    addTearDown(() async {
-      await server.close();
-    });
-
-    var portalServer = MockPortalServer(clientAddress,
         networkAvailable: true, networkMetered: true, networkConnectivity: 0);
     await portalServer.start();
     addTearDown(() async {
       await portalServer.close();
     });
 
-    var client = XdgDesktopPortalClient(bus: DBusClient(clientAddress));
+    var busClient = DBusClient(clientAddress);
+    var client = XdgDesktopPortalClient(bus: busClient);
     addTearDown(() async {
       await client.close();
     });
 
-    client.networkMonitor.changed.listen(expectAsync1((value) {}));
     expect(
-        await client.networkMonitor.getStatus(),
-        equals(XdgNetworkStatus(
-            available: true,
-            metered: true,
-            connectivity: XdgNetworkConnectivity.local)));
+        client.networkMonitor.getStatus(),
+        emitsInOrder([
+          XdgNetworkStatus(
+              available: true,
+              metered: true,
+              connectivity: XdgNetworkConnectivity.local),
+          XdgNetworkStatus(
+              available: false,
+              metered: false,
+              connectivity: XdgNetworkConnectivity.full),
+        ]));
+
+    // Ensure that the first value has been retrieved.
+    await busClient.ping();
+
     await portalServer.setNetworkStatus(
         available: false, metered: false, connectivity: 3);
-    expect(
-        await client.networkMonitor.getStatus(),
-        equals(XdgNetworkStatus(
-            available: false,
-            metered: false,
-            connectivity: XdgNetworkConnectivity.full)));
   });
 
   test('network monitor - can reach', () async {
