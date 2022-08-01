@@ -503,6 +503,18 @@ void main() {
               timestamp:
                   DateTime.fromMicrosecondsSinceEpoch(1658718568000000))));
       expect(
+          location.hashCode,
+          equals(XdgLocation(
+                  latitude: 40.9,
+                  longitude: 174.9,
+                  altitude: 42.0,
+                  accuracy: 1.2,
+                  speed: 28.0,
+                  heading: 321.4,
+                  timestamp:
+                      DateTime.fromMicrosecondsSinceEpoch(1658718568000000))
+              .hashCode));
+      expect(
           location.toString(),
           equals(
               'XdgLocation(latitude: 40.9, longitude: 174.9, altitude: 42.0, accuracy: 1.2, speed: 28.0, heading: 321.4, timestamp: 2022-07-25 03:09:28.000Z)'));
