@@ -20,7 +20,7 @@ void main(List<String> args) async {
     }
 
     var client = XdgDesktopPortalClient();
-    client.networkMonitor.getStatus().listen((status) {
+    client.networkMonitor.status.listen((status) {
       print('Available: ${status.available}');
       if (status.available) {
         print('Metered: ${status.metered}');

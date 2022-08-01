@@ -205,7 +205,7 @@ class XdgNetworkMonitorPortal {
   }
 
   /// Get network status updates.
-  Stream<XdgNetworkStatus> getStatus() {
+  Stream<XdgNetworkStatus> get status {
     var controller = _NetworkStatusStreamController(this);
     return controller.stream;
   }

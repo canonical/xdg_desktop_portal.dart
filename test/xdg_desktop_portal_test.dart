@@ -504,7 +504,7 @@ void main() {
     });
 
     expect(
-        client.networkMonitor.getStatus(),
+        client.networkMonitor.status,
         emitsInOrder([
           XdgNetworkStatus(
               available: true,
