@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 import 'dart:io';
 import 'dart:typed_data';
@@ -68,7 +69,7 @@ class MockPortalRequestObject extends DBusObject {
     }
 
     if (methodCall.name == 'Close') {
-      await server.unregisterObject(this);
+      await server.removeRequest(this);
       return DBusMethodSuccessResponse();
     } else {
       return DBusMethodErrorResponse.unknownMethod();
@@ -79,7 +80,7 @@ class MockPortalRequestObject extends DBusObject {
       {int response = 0, Map<String, DBusValue> result = const {}}) async {
     await emitSignal('org.freedesktop.portal.Request', 'Response',
         [DBusUint32(response), DBusDict.stringVariant(result)]);
-    await server.unregisterObject(this);
+    await server.removeRequest(this);
   }
 }
 
@@ -97,7 +98,7 @@ class MockPortalSessionObject extends DBusObject {
 
     if (methodCall.name == 'Close') {
       await emitSignal('org.freedesktop.portal.Session', 'Closed');
-      await server.unregisterObject(this);
+      await server.removeSession(this);
       return DBusMethodSuccessResponse();
     } else {
       return DBusMethodErrorResponse.unknownMethod();
@@ -316,6 +317,7 @@ class MockPortalServer extends DBusClient {
   late final MockPortalObject _root;
 
   final requests = <MockPortalRequestObject>[];
+  final sessions = <MockPortalSessionObject>[];
   final usedTokens = <String>{};
 
   late final Map<String, Map<String, DBusValue>> notifications;
@@ -390,15 +392,26 @@ class MockPortalServer extends DBusClient {
 
   Future<MockPortalRequestObject> addRequest(
       String sender, String token) async {
-    var object = MockPortalRequestObject(this, sender, token);
-    await registerObject(object);
-    return object;
+    var request = MockPortalRequestObject(this, sender, token);
+    await registerObject(request);
+    return request;
+  }
+
+  Future<void> removeRequest(MockPortalRequestObject request) async {
+    requests.remove(request);
+    await unregisterObject(request);
   }
 
   Future<MockPortalSessionObject> addSession(String token) async {
-    var object = MockPortalSessionObject(this, token);
-    await registerObject(object);
-    return object;
+    var session = MockPortalSessionObject(this, token);
+    sessions.add(session);
+    await registerObject(session);
+    return session;
+  }
+
+  Future<void> removeSession(MockPortalSessionObject session) async {
+    sessions.remove(session);
+    await unregisterObject(session);
   }
 }
 
@@ -446,7 +459,7 @@ void main() {
         ]));
   });
 
-  test('get location', () async {
+  test('location', () async {
     var server = DBusServer();
     var clientAddress =
         await server.listenAddress(DBusAddress.unix(dir: Directory.systemTemp));
@@ -498,6 +511,54 @@ void main() {
       expect(portalServer.locationAccuracy, equals(4));
       expect(portalServer.lastParentWindow, equals('x11:12345'));
     }));
+  });
+
+  test('location - cancel', () async {
+    var server = DBusServer();
+    var clientAddress =
+        await server.listenAddress(DBusAddress.unix(dir: Directory.systemTemp));
+    addTearDown(() async {
+      await server.close();
+    });
+
+    var portalServer = MockPortalServer(clientAddress,
+        latitude: 40.9,
+        longitude: 174.9,
+        altitude: 42.0,
+        accuracy: 1.2,
+        speed: 28,
+        heading: 321.4,
+        locationTimestamp: 1658718568000000);
+    await portalServer.start();
+    addTearDown(() async {
+      await portalServer.close();
+    });
+
+    var busClient = DBusClient(clientAddress);
+    var client = XdgDesktopPortalClient(bus: busClient);
+    addTearDown(() async {
+      await client.close();
+    });
+
+    expect(portalServer.sessions, isEmpty);
+    var locations = client.location.createSession(
+        distanceThreshold: 1,
+        timeThreshold: 10,
+        accuracy: XdgLocationAccuracy.street,
+        parentWindow: 'x11:12345');
+    var locationCompleter = Completer();
+    var s = locations.listen((location) async {
+      locationCompleter.complete();
+    });
+
+    // Ensure that the session has been created and then check for it.
+    await busClient.ping();
+    expect(portalServer.sessions, hasLength(1));
+
+    /// Once get the first location, cancel the stream which should end the session.
+    await locationCompleter.future;
+    await s.cancel();
+    expect(portalServer.sessions, isEmpty);
   });
 
   test('network monitor - status', () async {
