@@ -46,6 +46,19 @@ class _XdgPortalRequest {
 /// Response from a portal request.
 enum _XdgPortalResponse { success, cancelled, other }
 
+/// Check response is success, otherwise throw an exception.
+void _checkResponse(_XdgPortalResponse response) {
+  switch (response) {
+    case _XdgPortalResponse.success:
+      return;
+    case _XdgPortalResponse.cancelled:
+      throw XdgPortalRequestCancelledException();
+    case _XdgPortalResponse.other:
+    default:
+      throw XdgPortalRequestFailedException();
+  }
+}
+
 /// A session opened on a portal.
 class _XdgPortalSession {
   /// The client that is connected to this portal.
@@ -113,15 +126,7 @@ class XdgEmailPortal {
     var request =
         _XdgPortalRequest(client, result.returnValues[0].asObjectPath());
     client._addRequest(request);
-    switch (await request.response) {
-      case _XdgPortalResponse.success:
-        break;
-      case _XdgPortalResponse.cancelled:
-        throw XdgPortalRequestCancelledException();
-      case _XdgPortalResponse.other:
-      default:
-        throw XdgPortalRequestFailedException();
-    }
+    _checkResponse(await request.response);
   }
 }
 
@@ -542,17 +547,7 @@ class _LocationStreamController {
     client._addSession(session!);
 
     var startRequest = await session!.start(parentWindow: parentWindow);
-    switch (await startRequest.response) {
-      case _XdgPortalResponse.success:
-        break;
-      case _XdgPortalResponse.cancelled:
-        controller.addError('Request was cancelled');
-        break;
-      case _XdgPortalResponse.other:
-      default:
-        controller.addError('Location session start failed');
-        break;
-    }
+    _checkResponse(await startRequest.response);
   }
 
   Future<void> _onCancel() async {
@@ -666,15 +661,7 @@ class XdgOpenUriPortal {
     var request =
         _XdgPortalRequest(client, result.returnValues[0].asObjectPath());
     client._addRequest(request);
-    switch (await request.response) {
-      case _XdgPortalResponse.success:
-        break;
-      case _XdgPortalResponse.cancelled:
-        throw XdgPortalRequestCancelledException();
-      case _XdgPortalResponse.other:
-      default:
-        throw XdgPortalRequestFailedException();
-    }
+    _checkResponse(await request.response);
   }
 
   // FIXME: OpenFile
