@@ -462,7 +462,7 @@ class XdgLocation {
 
   @override
   String toString() =>
-      '$runtimeType(latitude: $latitude, longitude: $longitude, altitude: $altitude, accuracy: $accuracy, speed: $speed, heading: $heading, timestamp: $timestamp)';
+      '$runtimeType(latitude: $latitude, longitude: $longitude, altitude: $altitude, accuracy: $accuracy, speed: $speed, heading: $heading, timestamp: ${timestamp?.toUtc()})';
 }
 
 /// A location session.

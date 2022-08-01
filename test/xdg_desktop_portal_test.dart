@@ -492,7 +492,7 @@ void main() {
       expect(
           location.toString(),
           equals(
-              'XdgLocation(latitude: 40.9, longitude: 174.9, altitude: 42.0, accuracy: 1.2, speed: 28.0, heading: 321.4, timestamp: 2022-07-25 15:09:28.000)'));
+              'XdgLocation(latitude: 40.9, longitude: 174.9, altitude: 42.0, accuracy: 1.2, speed: 28.0, heading: 321.4, timestamp: 2022-07-25 03:09:28.000Z)'));
       expect(portalServer.locationDistanceThreshold, equals(1));
       expect(portalServer.locationTimeThreshold, equals(10));
       expect(portalServer.locationAccuracy, equals(4));
