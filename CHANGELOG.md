@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.7
+
+* Use a property for XdgNetworkMonitorPortal.status
+
 ## 0.1.6
 
 * Use a stream for network status.
