@@ -64,11 +64,8 @@ class _XdgPortalSession {
   /// The client that is connected to this portal.
   XdgDesktopPortalClient client;
 
-  /// true when this session has been closed by the portal.
-  Future<bool> get closed => _closedCompleter.future;
-
+  /// Object on the portal that represents this session.
   late final DBusRemoteObject _object;
-  final _closedCompleter = Completer<bool>();
 
   _XdgPortalSession(this.client, DBusObjectPath path) {
     _object =
@@ -80,6 +77,9 @@ class _XdgPortalSession {
     await _object.callMethod('org.freedesktop.portal.Session', 'Close', [],
         replySignature: DBusSignature(''));
   }
+
+  /// Called when the session is closed by the portal
+  Future<void> _handleClosed() async {}
 }
 
 /// Portal to send email.
@@ -490,6 +490,11 @@ class _XdgLocationSession extends _XdgPortalSession {
     client._addRequest(request);
     return request;
   }
+
+  @override
+  Future<void> _handleClosed() async {
+    await controller.close();
+  }
 }
 
 /// Provides a stream of locations using the portal APIs.
@@ -786,7 +791,7 @@ class XdgDesktopPortalClient {
     _sessionClosedSubscription = sessionClosed.listen((signal) {
       var session = _sessions.remove(signal.path);
       if (session != null) {
-        session._closedCompleter.complete(true);
+        session._handleClosed();
       }
     });
     email = XdgEmailPortal(this);
