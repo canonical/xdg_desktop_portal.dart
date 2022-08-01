@@ -161,6 +161,10 @@ class MockPortalObject extends DBusObject {
         if (token == null) {
           return DBusMethodErrorResponse.invalidArgs('Missing token');
         }
+        server.locationDistanceThreshold =
+            options['distance-threshold']?.asUint32();
+        server.locationTimeThreshold = options['time-threshold']?.asUint32();
+        server.locationAccuracy = options['accuracy']?.asUint32();
         var session = await server.addSession(token);
         return DBusMethodSuccessResponse([session.path]);
       case 'Start':
@@ -330,6 +334,9 @@ class MockPortalServer extends DBusClient {
 
   String? lastParentWindow;
   final composedEmails = <MockEmail>[];
+  int? locationDistanceThreshold;
+  int? locationTimeThreshold;
+  int? locationAccuracy;
   final openedUris = <MockUri>[];
 
   MockPortalServer(DBusAddress clientAddress,
@@ -465,7 +472,11 @@ void main() {
       await client.close();
     });
 
-    var locations = client.location.createSession(parentWindow: 'x11:12345');
+    var locations = client.location.createSession(
+        distanceThreshold: 1,
+        timeThreshold: 10,
+        accuracy: XdgLocationAccuracy.street,
+        parentWindow: 'x11:12345');
     locations.listen(expectAsync1((location) {
       expect(
           location,
@@ -478,6 +489,9 @@ void main() {
               heading: 321.4,
               timestamp:
                   DateTime.fromMicrosecondsSinceEpoch(1658718568000000))));
+      expect(portalServer.locationDistanceThreshold, equals(1));
+      expect(portalServer.locationTimeThreshold, equals(10));
+      expect(portalServer.locationAccuracy, equals(4));
       expect(portalServer.lastParentWindow, equals('x11:12345'));
     }));
   });
