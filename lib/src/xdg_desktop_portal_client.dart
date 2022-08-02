@@ -16,24 +16,17 @@ class XdgPortalRequestFailedException implements Exception {
 }
 
 /// A request sent to a portal.
-class _XdgPortalRequest {
-  /// The client that is connected to this portal.
-  XdgDesktopPortalClient client;
-
+class _XdgPortalRequest extends DBusRemoteObject {
   /// The result of this request.
   Future<_XdgPortalResponse> get response => _response.future;
   final _response = Completer<_XdgPortalResponse>();
 
-  late final DBusRemoteObject _object;
-
-  _XdgPortalRequest(this.client, DBusObjectPath path) {
-    _object =
-        DBusRemoteObject(client._bus, name: client._object.name, path: path);
-  }
+  _XdgPortalRequest(XdgDesktopPortalClient client, DBusObjectPath path)
+      : super(client._bus, name: client._object.name, path: path);
 
   /// Ends the user interaction with this request.
   Future<void> close() async {
-    await _object.callMethod('org.freedesktop.portal.Request', 'Close', [],
+    await callMethod('org.freedesktop.portal.Request', 'Close', [],
         replySignature: DBusSignature(''));
   }
 
@@ -60,21 +53,13 @@ void _checkResponse(_XdgPortalResponse response) {
 }
 
 /// A session opened on a portal.
-abstract class _XdgPortalSession {
-  /// The client that is connected to this portal.
-  XdgDesktopPortalClient client;
-
-  /// Object on the portal that represents this session.
-  late final DBusRemoteObject _object;
-
-  _XdgPortalSession(this.client, DBusObjectPath path) {
-    _object =
-        DBusRemoteObject(client._bus, name: client._object.name, path: path);
-  }
+abstract class _XdgPortalSession extends DBusRemoteObject {
+  _XdgPortalSession(XdgDesktopPortalClient client, DBusObjectPath path)
+      : super(client._bus, name: client._object.name, path: path);
 
   /// Close the session.
   Future<void> close() async {
-    await _object.callMethod('org.freedesktop.portal.Session', 'Close', [],
+    await callMethod('org.freedesktop.portal.Session', 'Close', [],
         replySignature: DBusSignature(''));
   }
 
@@ -467,27 +452,25 @@ class XdgLocation {
 
 /// A location session.
 class _XdgLocationSession extends _XdgPortalSession {
+  /// The client that is connected to this portal.
+  XdgDesktopPortalClient portalClient;
+
   final StreamController<XdgLocation> controller;
 
-  _XdgLocationSession(
-      XdgDesktopPortalClient client, DBusObjectPath path, this.controller)
-      : super(client, path);
+  _XdgLocationSession(this.portalClient, DBusObjectPath path, this.controller)
+      : super(portalClient, path);
 
   /// Start this session.
   Future<_XdgPortalRequest> start({String parentWindow = ''}) async {
     var options = <String, DBusValue>{};
-    var result = await client._object.callMethod(
+    var result = await portalClient._object.callMethod(
         'org.freedesktop.portal.Location',
         'Start',
-        [
-          _object.path,
-          DBusString(parentWindow),
-          DBusDict.stringVariant(options)
-        ],
+        [path, DBusString(parentWindow), DBusDict.stringVariant(options)],
         replySignature: DBusSignature('o'));
     var handle = result.returnValues[0].asObjectPath();
-    var request = _XdgPortalRequest(client, handle);
-    client._addRequest(request);
+    var request = _XdgPortalRequest(portalClient, handle);
+    portalClient._addRequest(request);
     return request;
   }
 
@@ -827,11 +810,11 @@ class XdgDesktopPortalClient {
 
   /// Record an active portal request.
   void _addRequest(_XdgPortalRequest request) {
-    _requests[request._object.path] = request;
+    _requests[request.path] = request;
   }
 
   /// Record an active portal session.
   void _addSession(_XdgPortalSession session) {
-    _sessions[session._object.path] = session;
+    _sessions[session.path] = session;
   }
 }
