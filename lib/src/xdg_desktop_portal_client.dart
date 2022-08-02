@@ -60,7 +60,7 @@ void _checkResponse(_XdgPortalResponse response) {
 }
 
 /// A session opened on a portal.
-class _XdgPortalSession {
+abstract class _XdgPortalSession {
   /// The client that is connected to this portal.
   XdgDesktopPortalClient client;
 
@@ -79,7 +79,7 @@ class _XdgPortalSession {
   }
 
   /// Called when the session is closed by the portal
-  Future<void> _handleClosed() async {}
+  Future<void> _handleClosed();
 }
 
 /// Portal to send email.
