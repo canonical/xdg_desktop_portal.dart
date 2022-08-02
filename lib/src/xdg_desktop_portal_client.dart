@@ -24,6 +24,19 @@ class _XdgPortalRequest extends DBusRemoteObject {
   _XdgPortalRequest(XdgDesktopPortalClient client, DBusObjectPath path)
       : super(client._bus, name: client._object.name, path: path);
 
+  /// Waits for a success response to be received or throws an exception.
+  Future<void> checkSuccess() async {
+    switch (await response) {
+      case _XdgPortalResponse.success:
+        return;
+      case _XdgPortalResponse.cancelled:
+        throw XdgPortalRequestCancelledException();
+      case _XdgPortalResponse.other:
+      default:
+        throw XdgPortalRequestFailedException();
+    }
+  }
+
   /// Ends the user interaction with this request.
   Future<void> close() async {
     await callMethod('org.freedesktop.portal.Request', 'Close', [],
@@ -38,19 +51,6 @@ class _XdgPortalRequest extends DBusRemoteObject {
 
 /// Response from a portal request.
 enum _XdgPortalResponse { success, cancelled, other }
-
-/// Check response is success, otherwise throw an exception.
-void _checkResponse(_XdgPortalResponse response) {
-  switch (response) {
-    case _XdgPortalResponse.success:
-      return;
-    case _XdgPortalResponse.cancelled:
-      throw XdgPortalRequestCancelledException();
-    case _XdgPortalResponse.other:
-    default:
-      throw XdgPortalRequestFailedException();
-  }
-}
 
 /// A session opened on a portal.
 abstract class _XdgPortalSession extends DBusRemoteObject {
@@ -111,7 +111,7 @@ class XdgEmailPortal {
     var request =
         _XdgPortalRequest(client, result.returnValues[0].asObjectPath());
     client._addRequest(request);
-    _checkResponse(await request.response);
+    await request.checkSuccess();
   }
 }
 
@@ -535,7 +535,7 @@ class _LocationStreamController {
     client._addSession(session!);
 
     var startRequest = await session!.start(parentWindow: parentWindow);
-    _checkResponse(await startRequest.response);
+    await startRequest.checkSuccess();
   }
 
   Future<void> _onCancel() async {
@@ -649,7 +649,7 @@ class XdgOpenUriPortal {
     var request =
         _XdgPortalRequest(client, result.returnValues[0].asObjectPath());
     client._addRequest(request);
-    _checkResponse(await request.response);
+    await request.checkSuccess();
   }
 
   // FIXME: OpenFile
