@@ -47,7 +47,7 @@ class _XdgPortalRequest {
       try {
         await _object.callMethod('org.freedesktop.portal.Request', 'Close', [],
             replySignature: DBusSignature(''));
-      } catch (e) {
+      } on DBusMethodResponseException {
         // Ignore errors, as the request may have completed before the close request was received.
       }
     }
