@@ -16,36 +16,59 @@ class XdgPortalRequestFailedException implements Exception {
 }
 
 /// A request sent to a portal.
-class _XdgPortalRequest extends DBusRemoteObject {
-  /// The result of this request.
-  Future<_XdgPortalResponse> get response => _response.future;
-  final _response = Completer<_XdgPortalResponse>();
+class _XdgPortalRequest {
+  /// The client that is the request is from.
+  XdgDesktopPortalClient client;
 
-  _XdgPortalRequest(XdgDesktopPortalClient client, DBusObjectPath path)
-      : super(client._bus, name: client._object.name, path: path);
+  /// Stream containing the single result returned from the portal.
+  Stream<Map<String, DBusValue>> get stream => _controller.stream;
 
-  /// Waits for a success response to be received or throws an exception.
-  Future<void> checkSuccess() async {
-    switch (await response) {
-      case _XdgPortalResponse.success:
-        return;
-      case _XdgPortalResponse.cancelled:
-        throw XdgPortalRequestCancelledException();
-      case _XdgPortalResponse.other:
-      default:
-        throw XdgPortalRequestFailedException();
-    }
+  final Future<DBusObjectPath> Function() _send;
+  late final StreamController<Map<String, DBusValue>> _controller;
+  late final DBusRemoteObject _object;
+  var _haveResponse = false;
+
+  _XdgPortalRequest(this.client, this._send) {
+    _controller = StreamController<Map<String, DBusValue>>(
+        onListen: _onListen, onCancel: _onCancel);
   }
 
-  /// Ends the user interaction with this request.
-  Future<void> close() async {
-    await callMethod('org.freedesktop.portal.Request', 'Close', [],
-        replySignature: DBusSignature(''));
+  /// Send the request.
+  Future<void> _onListen() async {
+    var path = await _send();
+    _object =
+        DBusRemoteObject(client._bus, name: client._object.name, path: path);
+    client._addRequest(path, this);
+  }
+
+  Future<void> _onCancel() async {
+    // If got a response, then the request object has already been removed.
+    if (!_haveResponse) {
+      try {
+        await _object.callMethod('org.freedesktop.portal.Request', 'Close', [],
+            replySignature: DBusSignature(''));
+      } catch (e) {
+        // Ignore errors, as the request may have completed before the close request was received.
+      }
+    }
   }
 
   void _handleResponse(
       _XdgPortalResponse response, Map<String, DBusValue> result) {
-    _response.complete(response);
+    _haveResponse = true;
+    switch (response) {
+      case _XdgPortalResponse.success:
+        _controller.add(result);
+        return;
+      case _XdgPortalResponse.cancelled:
+        _controller.addError(XdgPortalRequestCancelledException());
+        break;
+      case _XdgPortalResponse.other:
+      default:
+        _controller.addError(XdgPortalRequestFailedException());
+        break;
+    }
+    _controller.close();
   }
 }
 
@@ -83,35 +106,35 @@ class XdgEmailPortal {
       Iterable<String> bcc = const [],
       String? subject,
       String? body}) async {
-    var options = <String, DBusValue>{};
-    options['handle_token'] = DBusString(client._generateToken());
-    if (address != null) {
-      options['address'] = DBusString(address);
-    }
-    if (addresses.isNotEmpty) {
-      options['addresses'] = DBusArray.string(addresses);
-    }
-    if (cc.isNotEmpty) {
-      options['cc'] = DBusArray.string(cc);
-    }
-    if (bcc.isNotEmpty) {
-      options['bcc'] = DBusArray.string(bcc);
-    }
-    if (subject != null) {
-      options['subject'] = DBusString(subject);
-    }
-    if (body != null) {
-      options['body'] = DBusString(body);
-    }
-    var result = await client._object.callMethod(
-        'org.freedesktop.portal.Email',
-        'ComposeEmail',
-        [DBusString(parentWindow), DBusDict.stringVariant(options)],
-        replySignature: DBusSignature('o'));
-    var request =
-        _XdgPortalRequest(client, result.returnValues[0].asObjectPath());
-    client._addRequest(request);
-    await request.checkSuccess();
+    var request = _XdgPortalRequest(client, () async {
+      var options = <String, DBusValue>{};
+      options['handle_token'] = DBusString(client._generateToken());
+      if (address != null) {
+        options['address'] = DBusString(address);
+      }
+      if (addresses.isNotEmpty) {
+        options['addresses'] = DBusArray.string(addresses);
+      }
+      if (cc.isNotEmpty) {
+        options['cc'] = DBusArray.string(cc);
+      }
+      if (bcc.isNotEmpty) {
+        options['bcc'] = DBusArray.string(bcc);
+      }
+      if (subject != null) {
+        options['subject'] = DBusString(subject);
+      }
+      if (body != null) {
+        options['body'] = DBusString(body);
+      }
+      var result = await client._object.callMethod(
+          'org.freedesktop.portal.Email',
+          'ComposeEmail',
+          [DBusString(parentWindow), DBusDict.stringVariant(options)],
+          replySignature: DBusSignature('o'));
+      return result.returnValues[0].asObjectPath();
+    });
+    await request.stream.first;
   }
 }
 
@@ -462,15 +485,15 @@ class _XdgLocationSession extends _XdgPortalSession {
 
   /// Start this session.
   Future<_XdgPortalRequest> start({String parentWindow = ''}) async {
-    var options = <String, DBusValue>{};
-    var result = await portalClient._object.callMethod(
-        'org.freedesktop.portal.Location',
-        'Start',
-        [path, DBusString(parentWindow), DBusDict.stringVariant(options)],
-        replySignature: DBusSignature('o'));
-    var handle = result.returnValues[0].asObjectPath();
-    var request = _XdgPortalRequest(portalClient, handle);
-    portalClient._addRequest(request);
+    var request = _XdgPortalRequest(portalClient, () async {
+      var options = <String, DBusValue>{};
+      var result = await portalClient._object.callMethod(
+          'org.freedesktop.portal.Location',
+          'Start',
+          [path, DBusString(parentWindow), DBusDict.stringVariant(options)],
+          replySignature: DBusSignature('o'));
+      return result.returnValues[0].asObjectPath();
+    });
     return request;
   }
 
@@ -535,7 +558,7 @@ class _LocationStreamController {
     client._addSession(session!);
 
     var startRequest = await session!.start(parentWindow: parentWindow);
-    await startRequest.checkSuccess();
+    await startRequest.stream.first;
   }
 
   Future<void> _onCancel() async {
@@ -626,30 +649,30 @@ class XdgOpenUriPortal {
       bool? writable,
       bool? ask,
       String? activationToken}) async {
-    var options = <String, DBusValue>{};
-    options['handle_token'] = DBusString(client._generateToken());
-    if (writable != null) {
-      options['writable'] = DBusBoolean(writable);
-    }
-    if (ask != null) {
-      options['ask'] = DBusBoolean(ask);
-    }
-    if (activationToken != null) {
-      options['activation_token'] = DBusString(activationToken);
-    }
-    var result = await client._object.callMethod(
-        'org.freedesktop.portal.OpenURI',
-        'OpenURI',
-        [
-          DBusString(parentWindow),
-          DBusString(uri),
-          DBusDict.stringVariant(options)
-        ],
-        replySignature: DBusSignature('o'));
-    var request =
-        _XdgPortalRequest(client, result.returnValues[0].asObjectPath());
-    client._addRequest(request);
-    await request.checkSuccess();
+    var request = _XdgPortalRequest(client, () async {
+      var options = <String, DBusValue>{};
+      options['handle_token'] = DBusString(client._generateToken());
+      if (writable != null) {
+        options['writable'] = DBusBoolean(writable);
+      }
+      if (ask != null) {
+        options['ask'] = DBusBoolean(ask);
+      }
+      if (activationToken != null) {
+        options['activation_token'] = DBusString(activationToken);
+      }
+      var result = await client._object.callMethod(
+          'org.freedesktop.portal.OpenURI',
+          'OpenURI',
+          [
+            DBusString(parentWindow),
+            DBusString(uri),
+            DBusDict.stringVariant(options)
+          ],
+          replySignature: DBusSignature('o'));
+      return result.returnValues[0].asObjectPath();
+    });
+    await request.stream.first;
   }
 
   // FIXME: OpenFile
@@ -809,8 +832,8 @@ class XdgDesktopPortalClient {
   }
 
   /// Record an active portal request.
-  void _addRequest(_XdgPortalRequest request) {
-    _requests[request.path] = request;
+  void _addRequest(DBusObjectPath path, _XdgPortalRequest request) {
+    _requests[path] = request;
   }
 
   /// Record an active portal session.
