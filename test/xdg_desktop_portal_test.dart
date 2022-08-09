@@ -6,6 +6,12 @@ import 'dart:typed_data';
 import 'package:collection/collection.dart';
 import 'package:dbus/dbus.dart';
 import 'package:test/test.dart';
+import 'package:xdg_desktop_portal/src/portal/location/xdg_location.dart';
+import 'package:xdg_desktop_portal/src/portal/location/xdg_location_accuracy.dart';
+import 'package:xdg_desktop_portal/src/portal/network/xdg_network_status.dart';
+import 'package:xdg_desktop_portal/src/portal/notification/xdg_notification_button.dart';
+import 'package:xdg_desktop_portal/src/portal/notification/xdg_notification_icon.dart';
+import 'package:xdg_desktop_portal/src/portal/notification/xdg_notification_priority.dart';
 import 'package:xdg_desktop_portal/xdg_desktop_portal.dart';
 
 class MockEmail {

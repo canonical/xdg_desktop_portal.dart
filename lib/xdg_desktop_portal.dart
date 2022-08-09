@@ -1,1 +1,1 @@
-export 'src/xdg_desktop_portal_client.dart';
+export 'src/portal/xdg_desktop_portal_client.dart';
