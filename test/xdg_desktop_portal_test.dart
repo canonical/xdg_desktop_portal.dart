@@ -55,6 +55,27 @@ class MockUri {
   String toString() => '$runtimeType($uri, $options)';
 }
 
+class MockLocationSession {
+  final Map<String, DBusValue> options;
+
+  MockLocationSession(this.options);
+
+  @override
+  int get hashCode => Object.hashAll(
+      options.entries.map((entry) => Object.hash(entry.key, entry.value)));
+
+  @override
+  bool operator ==(other) {
+    if (identical(this, other)) return true;
+    final mapEquals = const DeepCollectionEquality().equals;
+
+    return other is MockLocationSession && mapEquals(other.options, options);
+  }
+
+  @override
+  String toString() => '$runtimeType($options)';
+}
+
 class MockPortalRequestObject extends DBusObject {
   final MockPortalServer server;
 
@@ -162,10 +183,9 @@ class MockPortalObject extends DBusObject {
         if (token == null) {
           return DBusMethodErrorResponse.invalidArgs('Missing token');
         }
-        server.locationDistanceThreshold =
-            options['distance-threshold']?.asUint32();
-        server.locationTimeThreshold = options['time-threshold']?.asUint32();
-        server.locationAccuracy = options['accuracy']?.asUint32();
+        options.removeWhere((key, value) => key == 'session_handle_token');
+        var locationSession = MockLocationSession(options);
+        server.locationSessions.add(locationSession);
         var session = await server.addSession(token);
         return DBusMethodSuccessResponse([session.path]);
       case 'Start':
@@ -336,10 +356,8 @@ class MockPortalServer extends DBusClient {
 
   String? lastParentWindow;
   final composedEmails = <MockEmail>[];
-  int? locationDistanceThreshold;
-  int? locationTimeThreshold;
-  int? locationAccuracy;
   final openedUris = <MockUri>[];
+  final locationSessions = <MockLocationSession>[];
 
   MockPortalServer(DBusAddress clientAddress,
       {Map<String, Map<String, DBusValue>>? notifications,
@@ -518,9 +536,15 @@ void main() {
           location.toString(),
           equals(
               'XdgLocation(latitude: 40.9, longitude: 174.9, altitude: 42.0, accuracy: 1.2, speed: 28.0, heading: 321.4, timestamp: 2022-07-25 03:09:28.000Z)'));
-      expect(portalServer.locationDistanceThreshold, equals(1));
-      expect(portalServer.locationTimeThreshold, equals(10));
-      expect(portalServer.locationAccuracy, equals(4));
+      expect(
+          portalServer.locationSessions,
+          equals([
+            MockLocationSession({
+              'distance-threshold': DBusUint32(1),
+              'time-threshold': DBusUint32(10),
+              'accuracy': DBusUint32(4)
+            })
+          ]));
       expect(portalServer.lastParentWindow, equals('x11:12345'));
     }));
   });
