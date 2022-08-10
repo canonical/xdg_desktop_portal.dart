@@ -9,6 +9,32 @@ import 'package:dbus/dbus.dart';
 import 'package:test/test.dart';
 import 'package:xdg_desktop_portal/xdg_desktop_portal.dart';
 
+class MockAccountDialog {
+  final String parentWindow;
+  final Map<String, DBusValue> options;
+
+  MockAccountDialog(this.parentWindow, this.options);
+
+  @override
+  int get hashCode => Object.hash(
+      parentWindow,
+      Object.hashAll(
+          options.entries.map((entry) => Object.hash(entry.key, entry.value))));
+
+  @override
+  bool operator ==(other) {
+    if (identical(this, other)) return true;
+    final mapEquals = const DeepCollectionEquality().equals;
+
+    return other is MockAccountDialog &&
+        other.parentWindow == parentWindow &&
+        mapEquals(other.options, options);
+  }
+
+  @override
+  String toString() => '$runtimeType($parentWindow, $options)';
+}
+
 class MockEmail {
   final String parentWindow;
   final Map<String, DBusValue> options;
@@ -184,6 +210,8 @@ class MockPortalObject extends DBusObject {
   @override
   Future<DBusMethodResponse> handleMethodCall(DBusMethodCall methodCall) async {
     switch (methodCall.interface) {
+      case 'org.freedesktop.portal.Account':
+        return handleAccountMethodCall(methodCall);
       case 'org.freedesktop.portal.Email':
         return handleEmailMethodCall(methodCall);
       case 'org.freedesktop.portal.FileChooser':
@@ -202,6 +230,38 @@ class MockPortalObject extends DBusObject {
         return handleSettingsMethodCall(methodCall);
       default:
         return DBusMethodErrorResponse.unknownInterface();
+    }
+  }
+
+  Future<DBusMethodResponse> handleAccountMethodCall(
+      DBusMethodCall methodCall) async {
+    switch (methodCall.name) {
+      case 'GetUserInformation':
+        var parentWindow = methodCall.values[0].asString();
+        var options = methodCall.values[1].asStringVariantDict();
+        var token =
+            options['handle_token']?.asString() ?? server.generateToken();
+        options.removeWhere((key, value) => key == 'handle_token');
+        var dialog = MockAccountDialog(parentWindow, options);
+        server.accountDialogs.add(dialog);
+        var request = await server.addRequest(methodCall.sender, token,
+            onClosed: () async {
+          server.accountDialogs.remove(dialog);
+        });
+        if (server.userId != null &&
+            server.userName != null &&
+            server.userImage != null) {
+          Future.delayed(
+              Duration.zero,
+              () async => await request.respond(result: {
+                    'id': DBusString(server.userId!),
+                    'name': DBusString(server.userName!),
+                    'image': DBusString(server.userImage!),
+                  }));
+        }
+        return DBusMethodSuccessResponse([request.path]);
+      default:
+        return DBusMethodErrorResponse.unknownMethod();
     }
   }
 
@@ -459,6 +519,9 @@ class MockPortalServer extends DBusClient {
   final sessions = <MockPortalSessionObject>[];
   final usedTokens = <String>{};
 
+  final String? userId;
+  final String? userName;
+  final String? userImage;
   final List<String>? openFileUris;
   final List<String>? saveFileUris;
   final List<String>? saveFilesUris;
@@ -476,6 +539,7 @@ class MockPortalServer extends DBusClient {
   bool networkMetered;
   int networkConnectivity;
 
+  final accountDialogs = <MockAccountDialog>[];
   final composedEmails = <MockEmail>[];
   final openedUris = <MockUri>[];
   final openFileDialogs = <MockDialog>[];
@@ -486,7 +550,10 @@ class MockPortalServer extends DBusClient {
   final _locationSessions = <DBusObjectPath, MockLocationSession>{};
 
   MockPortalServer(DBusAddress clientAddress,
-      {this.openFileUris,
+      {this.userId,
+      this.userName,
+      this.userImage,
+      this.openFileUris,
       this.saveFileUris,
       this.saveFilesUris,
       Map<String, Map<String, DBusValue>>? notifications,
@@ -563,6 +630,56 @@ class MockPortalServer extends DBusClient {
 }
 
 void main() {
+  test('account', () async {
+    var server = DBusServer();
+    var clientAddress =
+        await server.listenAddress(DBusAddress.unix(dir: Directory.systemTemp));
+    addTearDown(() async {
+      await server.close();
+    });
+
+    var portalServer = MockPortalServer(
+      clientAddress,
+      userId: 'alice',
+      userName: 'alice',
+      userImage: 'file://home/me/image.png',
+    );
+    await portalServer.start();
+    addTearDown(() async {
+      await portalServer.close();
+    });
+
+    var client = XdgDesktopPortalClient(bus: DBusClient(clientAddress));
+    addTearDown(() async {
+      await client.close();
+    });
+
+    var result = await client.account
+        .getUserInformation(
+            parentWindow: 'x11:12345',
+            reason:
+                'Allows your personal information to be included with recipes you share with your friends.')
+        .first;
+    expect(
+        portalServer.accountDialogs,
+        equals([
+          MockAccountDialog('x11:12345', {
+            'reason': DBusString(
+                'Allows your personal information to be included with recipes you share with your friends.'),
+          })
+        ]));
+    expect(
+      result,
+      equals(
+        XdgAccountUserInformation(
+          id: 'alice',
+          name: 'alice',
+          image: 'file://home/me/image.png',
+        ),
+      ),
+    );
+  });
+
   test('email', () async {
     var server = DBusServer();
     var clientAddress =
