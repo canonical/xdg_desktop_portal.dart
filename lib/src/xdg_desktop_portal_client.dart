@@ -14,6 +14,7 @@ class _XdgPortalSession {
   /// Stream for the session.
   Stream<void> get stream => _controller.stream;
 
+  StreamSubscription? _sessionClosedSubscription;
   final Future<DBusObjectPath> Function() _send;
   late final StreamController<void> _controller;
 
@@ -31,20 +32,25 @@ class _XdgPortalSession {
 
   /// Send the request.
   Future<void> _onListen() async {
+    var sessionClosed = DBusSignalStream(client._bus,
+        interface: 'org.freedesktop.portal.Session',
+        name: 'Closed',
+        signature: DBusSignature(''));
+    _sessionClosedSubscription = sessionClosed.listen((signal) {
+      if (signal.path == _object?.path) {
+        _controller.close();
+      }
+    });
     var path = await _send();
     _object =
         DBusRemoteObject(client._bus, name: client._object.name, path: path);
-    client._addSession(path, this);
     _createdCompleter.complete(true);
   }
 
   Future<void> _onCancel() async {
+    await _sessionClosedSubscription?.cancel();
     await _object?.callMethod('org.freedesktop.portal.Session', 'Close', [],
         replySignature: DBusSignature(''));
-  }
-
-  void _handleClosed() {
-    _controller.close();
   }
 }
 
@@ -1112,10 +1118,6 @@ class XdgDesktopPortalClient {
 
   late final DBusRemoteObject _object;
 
-  late final StreamSubscription _sessionClosedSubscription;
-
-  final _sessions = <DBusObjectPath, _XdgPortalSession>{};
-
   /// Portal for obtaining information about the user.
   late final XdgAccountPortal account;
 
@@ -1153,16 +1155,6 @@ class XdgDesktopPortalClient {
     _object = DBusRemoteObject(_bus,
         name: 'org.freedesktop.portal.Desktop',
         path: DBusObjectPath('/org/freedesktop/portal/desktop'));
-    var sessionClosed = DBusSignalStream(_bus,
-        interface: 'org.freedesktop.portal.Session',
-        name: 'Closed',
-        signature: DBusSignature(''));
-    _sessionClosedSubscription = sessionClosed.listen((signal) {
-      var session = _sessions.remove(signal.path);
-      if (session != null) {
-        session._handleClosed();
-      }
-    });
     account = XdgAccountPortal(this);
     email = XdgEmailPortal(this);
     fileChooser = XdgFileChooserPortal(this);
@@ -1176,7 +1168,6 @@ class XdgDesktopPortalClient {
 
   /// Terminates all active connections. If a client remains unclosed, the Dart process may not terminate.
   Future<void> close() async {
-    await _sessionClosedSubscription.cancel();
     await networkMonitor._close();
     if (_closeBus) {
       await _bus.close();
@@ -1192,10 +1183,5 @@ class XdgDesktopPortalClient {
     } while (_usedTokens.contains(token));
     _usedTokens.add(token);
     return token;
-  }
-
-  /// Record an active portal session.
-  void _addSession(DBusObjectPath path, _XdgPortalSession session) {
-    _sessions[path] = session;
   }
 }
