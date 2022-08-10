@@ -596,9 +596,8 @@ class XdgLocationPortal {
 
       DateTime? timestamp;
       var timestampValue = location['Timestamp'];
-      if (timestampValue != null &&
-          timestampValue.signature == DBusSignature('(tt)')) {
-        var values = timestampValue.asStruct();
+      if (timestampValue?.signature == DBusSignature('(tt)')) {
+        var values = timestampValue!.asStruct();
         var s = values[0].asUint64();
         var us = values[1].asUint64();
         timestamp = DateTime.fromMicrosecondsSinceEpoch(s * 1000000 + us);
