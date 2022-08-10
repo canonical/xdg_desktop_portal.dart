@@ -5,54 +5,7 @@ import 'dart:typed_data';
 import 'package:dbus/dbus.dart';
 
 import 'xdg_portal_request.dart';
-
-/// A session opened on a portal.
-class _XdgPortalSession {
-  /// The client that is the session is from.
-  XdgDesktopPortalClient client;
-
-  /// Stream for the session.
-  Stream<void> get stream => _controller.stream;
-
-  StreamSubscription? _sessionClosedSubscription;
-  final Future<DBusObjectPath> Function() _send;
-  late final StreamController<void> _controller;
-
-  /// The object representing this session.
-  DBusRemoteObject? get object => _object;
-  DBusRemoteObject? _object;
-
-  Future<bool> get created => _createdCompleter.future;
-  final _createdCompleter = Completer<bool>();
-
-  _XdgPortalSession(this.client, this._send) {
-    _controller =
-        StreamController<void>(onListen: _onListen, onCancel: _onCancel);
-  }
-
-  /// Send the request.
-  Future<void> _onListen() async {
-    var sessionClosed = DBusSignalStream(client._bus,
-        interface: 'org.freedesktop.portal.Session',
-        name: 'Closed',
-        signature: DBusSignature(''));
-    _sessionClosedSubscription = sessionClosed.listen((signal) {
-      if (signal.path == _object?.path) {
-        _controller.close();
-      }
-    });
-    var path = await _send();
-    _object =
-        DBusRemoteObject(client._bus, name: client._object.name, path: path);
-    _createdCompleter.complete(true);
-  }
-
-  Future<void> _onCancel() async {
-    await _sessionClosedSubscription?.cancel();
-    await _object?.callMethod('org.freedesktop.portal.Session', 'Close', [],
-        replySignature: DBusSignature(''));
-  }
-}
+import 'xdg_portal_session.dart';
 
 /// Information about a user account.
 class XdgAccountUserInformation {
@@ -882,7 +835,7 @@ class _LocationStreamController {
   final String parentWindow;
 
   StreamSubscription? _locationUpdatedSubscription;
-  _XdgPortalSession? session;
+  XdgPortalSession? session;
   StreamSubscription? _sessionSubscription;
 
   /// Locations received from the portal.
@@ -937,7 +890,7 @@ class _LocationStreamController {
           timestamp: timestamp));
     });
 
-    session = _XdgPortalSession(portal.client, () async {
+    session = XdgPortalSession(portal.client._object, () async {
       var options = <String, DBusValue>{};
       options['session_handle_token'] =
           DBusString(portal.client._generateToken());
