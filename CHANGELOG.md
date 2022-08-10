@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.8
+
+* Add FileChooser portal.
+
 ## 0.1.7
 
 * Use a property for XdgNetworkMonitorPortal.status
