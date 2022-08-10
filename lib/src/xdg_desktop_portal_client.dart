@@ -37,19 +37,20 @@ class XdgAccountUserInformation {
 
 /// Portal for obtaining information about the use
 class XdgAccountPortal {
-  /// The client that is connected to this portal.
-  XdgDesktopPortalClient client;
-  XdgAccountPortal(this.client);
+  final DBusRemoteObject _object;
+  final String Function() _generateToken;
+
+  XdgAccountPortal(this._object, this._generateToken);
 
   Stream<XdgAccountUserInformation> getUserInformation(
       {String parentWindow = '', String reason = ''}) {
     var request = XdgPortalRequest(
-      client._object,
+      _object,
       () async {
         var options = <String, DBusValue>{};
-        options['handle_token'] = DBusString(client._generateToken());
+        options['handle_token'] = DBusString(_generateToken());
         options['reason'] = DBusString(reason);
-        var result = await client._object.callMethod(
+        var result = await _object.callMethod(
             'org.freedesktop.portal.Account',
             'GetUserInformation',
             [DBusString(parentWindow), DBusDict.stringVariant(options)],
@@ -69,10 +70,10 @@ class XdgAccountPortal {
 
 /// Portal to send email.
 class XdgEmailPortal {
-  /// The client that is connected to this portal.
-  XdgDesktopPortalClient client;
+  final DBusRemoteObject _object;
+  final String Function() _generateToken;
 
-  XdgEmailPortal(this.client);
+  XdgEmailPortal(this._object, this._generateToken);
 
   /// Present a window to compose an email.
   Future<void> composeEmail(
@@ -83,9 +84,9 @@ class XdgEmailPortal {
       Iterable<String> bcc = const [],
       String? subject,
       String? body}) async {
-    var request = XdgPortalRequest(client._object, () async {
+    var request = XdgPortalRequest(_object, () async {
       var options = <String, DBusValue>{};
-      options['handle_token'] = DBusString(client._generateToken());
+      options['handle_token'] = DBusString(_generateToken());
       if (address != null) {
         options['address'] = DBusString(address);
       }
@@ -104,7 +105,7 @@ class XdgEmailPortal {
       if (body != null) {
         options['body'] = DBusString(body);
       }
-      var result = await client._object.callMethod(
+      var result = await _object.callMethod(
           'org.freedesktop.portal.Email',
           'ComposeEmail',
           [DBusString(parentWindow), DBusDict.stringVariant(options)],
@@ -310,10 +311,10 @@ class XdgFileChooserPortalSaveFilesResult {
 
 /// Portal to request access to files.
 class XdgFileChooserPortal {
-  /// The client that is connected to this portal.
-  XdgDesktopPortalClient client;
+  final DBusRemoteObject _object;
+  final String Function() _generateToken;
 
-  XdgFileChooserPortal(this.client);
+  XdgFileChooserPortal(this._object, this._generateToken);
 
   /// Ask to open one or more files.
   Stream<XdgFileChooserPortalOpenFileResult> openFile(
@@ -326,9 +327,9 @@ class XdgFileChooserPortal {
       Iterable<XdgFileChooserFilter> filters = const [],
       XdgFileChooserFilter? currentFilter,
       Iterable<XdgFileChooserChoice> choices = const []}) {
-    var request = XdgPortalRequest(client._object, () async {
+    var request = XdgPortalRequest(_object, () async {
       var options = <String, DBusValue>{};
-      options['handle_token'] = DBusString(client._generateToken());
+      options['handle_token'] = DBusString(_generateToken());
       if (acceptLabel != null) {
         options['accept_label'] = DBusString(acceptLabel);
       }
@@ -350,7 +351,7 @@ class XdgFileChooserPortal {
       if (choices.isNotEmpty) {
         options['choices'] = _encodeChoices(choices);
       }
-      var result = await client._object.callMethod(
+      var result = await _object.callMethod(
           'org.freedesktop.portal.FileChooser',
           'OpenFile',
           [
@@ -386,9 +387,9 @@ class XdgFileChooserPortal {
       String? currentName,
       Uint8List? currentFolder,
       Uint8List? currentFile}) {
-    var request = XdgPortalRequest(client._object, () async {
+    var request = XdgPortalRequest(_object, () async {
       var options = <String, DBusValue>{};
-      options['handle_token'] = DBusString(client._generateToken());
+      options['handle_token'] = DBusString(_generateToken());
       if (acceptLabel != null) {
         options['accept_label'] = DBusString(acceptLabel);
       }
@@ -413,7 +414,7 @@ class XdgFileChooserPortal {
       if (currentFile != null) {
         options['current_file'] = DBusArray.byte(currentFile);
       }
-      var result = await client._object.callMethod(
+      var result = await _object.callMethod(
           'org.freedesktop.portal.FileChooser',
           'SaveFile',
           [
@@ -446,9 +447,9 @@ class XdgFileChooserPortal {
       Iterable<XdgFileChooserChoice> choices = const [],
       Uint8List? currentFolder,
       Iterable<Uint8List> files = const []}) {
-    var request = XdgPortalRequest(client._object, () async {
+    var request = XdgPortalRequest(_object, () async {
       var options = <String, DBusValue>{};
-      options['handle_token'] = DBusString(client._generateToken());
+      options['handle_token'] = DBusString(_generateToken());
       if (acceptLabel != null) {
         options['accept_label'] = DBusString(acceptLabel);
       }
@@ -465,7 +466,7 @@ class XdgFileChooserPortal {
         options['files'] =
             DBusArray(DBusSignature('ay'), files.map((f) => DBusArray.byte(f)));
       }
-      var result = await client._object.callMethod(
+      var result = await _object.callMethod(
           'org.freedesktop.portal.FileChooser',
           'SaveFiles',
           [
@@ -547,8 +548,7 @@ class _NetworkStatusStreamController {
 
 /// Portal to monitor networking.
 class XdgNetworkMonitorPortal {
-  /// The client that is connected to this portal.
-  XdgDesktopPortalClient client;
+  final DBusRemoteObject _object;
 
   /// Streams listening to status updates.
   final _activeStatusControllers = <_NetworkStatusStreamController>[];
@@ -560,9 +560,9 @@ class XdgNetworkMonitorPortal {
   // Last received status update, or null if not subscribed to status updates.
   XdgNetworkStatus? _lastStatus;
 
-  XdgNetworkMonitorPortal(this.client) {
+  XdgNetworkMonitorPortal(this._object) {
     _changed = DBusRemoteObjectSignalStream(
-        object: client._object,
+        object: _object,
         interface: 'org.freedesktop.portal.NetworkMonitor',
         name: 'changed',
         signature: DBusSignature(''));
@@ -576,7 +576,7 @@ class XdgNetworkMonitorPortal {
 
   /// Returns true if the given [hostname]:[port] is believed to be reachable.
   Future<bool> canReach(String hostname, int port) async {
-    var result = await client._object.callMethod(
+    var result = await _object.callMethod(
         'org.freedesktop.portal.NetworkMonitor',
         'CanReach',
         [DBusString(hostname), DBusUint32(port)],
@@ -609,7 +609,7 @@ class XdgNetworkMonitorPortal {
 
   /// Get the current status of the network from the portal.
   Future<XdgNetworkStatus> _updateStatus() async {
-    var result = await client._object.callMethod(
+    var result = await _object.callMethod(
         'org.freedesktop.portal.NetworkMonitor', 'GetStatus', [],
         replySignature: DBusSignature('a{sv}'));
     var options = result.returnValues[0].asStringVariantDict();
@@ -695,10 +695,9 @@ class XdgNotificationButton {
 
 /// Portal to create notifications.
 class XdgNotificationPortal {
-  /// The client that is connected to this portal.
-  XdgDesktopPortalClient client;
+  final DBusRemoteObject _object;
 
-  XdgNotificationPortal(this.client);
+  XdgNotificationPortal(this._object);
 
   /// Send a notification.
   /// [id] can be used later to withdraw the notification with [removeNotification].
@@ -754,7 +753,7 @@ class XdgNotificationPortal {
         return DBusDict.stringVariant(values);
       }));
     }
-    await client._object.callMethod(
+    await _object.callMethod(
         'org.freedesktop.portal.Notification',
         'AddNotification',
         [DBusString(id), DBusDict.stringVariant(notification)],
@@ -763,7 +762,7 @@ class XdgNotificationPortal {
 
   /// Withdraw a notification created with [addNotification].
   Future<void> removeNotification(String id) async {
-    await client._object.callMethod('org.freedesktop.portal.Notification',
+    await _object.callMethod('org.freedesktop.portal.Notification',
         'RemoveNotification', [DBusString(id)],
         replySignature: DBusSignature(''));
   }
@@ -826,7 +825,8 @@ class XdgLocation {
 
 /// Provides a stream of locations using the portal APIs.
 class _LocationStreamController {
-  final XdgLocationPortal portal;
+  final DBusRemoteObject portalObject;
+  final String Function() generateToken;
   late final StreamController<XdgLocation> controller;
 
   final int? distanceThreshold;
@@ -842,7 +842,8 @@ class _LocationStreamController {
   Stream<XdgLocation> get stream => controller.stream;
 
   _LocationStreamController(
-      {required this.portal,
+      {required this.portalObject,
+      required this.generateToken,
       this.distanceThreshold,
       this.timeThreshold,
       this.accuracy,
@@ -852,10 +853,10 @@ class _LocationStreamController {
   }
 
   Future<void> _onListen() async {
-    var locationUpdated = DBusSignalStream(portal.client._bus,
+    var locationUpdated = DBusSignalStream(portalObject.client,
         interface: 'org.freedesktop.portal.Location',
         name: 'LocationUpdated',
-        path: portal.client._object.path,
+        path: portalObject.path,
         signature: DBusSignature('oa{sv}'));
     _locationUpdatedSubscription = locationUpdated.listen((signal) {
       var path = signal.values[0].asObjectPath();
@@ -890,10 +891,9 @@ class _LocationStreamController {
           timestamp: timestamp));
     });
 
-    session = XdgPortalSession(portal.client._object, () async {
+    session = XdgPortalSession(portalObject, () async {
       var options = <String, DBusValue>{};
-      options['session_handle_token'] =
-          DBusString(portal.client._generateToken());
+      options['session_handle_token'] = DBusString(generateToken());
       if (distanceThreshold != null) {
         options['distance-threshold'] = DBusUint32(distanceThreshold!);
       }
@@ -911,7 +911,7 @@ class _LocationStreamController {
             }[accuracy!] ??
             5);
       }
-      var createResult = await portal.client._object.callMethod(
+      var createResult = await portalObject.callMethod(
           'org.freedesktop.portal.Location',
           'CreateSession',
           [DBusDict.stringVariant(options)],
@@ -924,9 +924,9 @@ class _LocationStreamController {
 
     await session!.created;
 
-    var startRequest = XdgPortalRequest(portal.client._object, () async {
+    var startRequest = XdgPortalRequest(portalObject, () async {
       var options = <String, DBusValue>{};
-      var result = await portal.client._object.callMethod(
+      var result = await portalObject.callMethod(
           'org.freedesktop.portal.Location',
           'Start',
           [
@@ -949,10 +949,10 @@ class _LocationStreamController {
 
 /// Portal to get location information.
 class XdgLocationPortal {
-  /// The client that is connected to this portal.
-  XdgDesktopPortalClient client;
+  final DBusRemoteObject _object;
+  final String Function() _generateToken;
 
-  XdgLocationPortal(this.client);
+  XdgLocationPortal(this._object, this._generateToken);
 
   /// Create a location session that returns a stream of location updates from the portal.
   /// When the session is no longer required close the stream.
@@ -962,7 +962,8 @@ class XdgLocationPortal {
       XdgLocationAccuracy? accuracy,
       String parentWindow = ''}) {
     var controller = _LocationStreamController(
-        portal: this,
+        portalObject: _object,
+        generateToken: _generateToken,
         distanceThreshold: distanceThreshold,
         timeThreshold: timeThreshold,
         accuracy: accuracy,
@@ -973,10 +974,10 @@ class XdgLocationPortal {
 
 /// Portal to open URIs.
 class XdgOpenUriPortal {
-  /// The client that is connected to this portal.
-  XdgDesktopPortalClient client;
+  final DBusRemoteObject _object;
+  final String Function() _generateToken;
 
-  XdgOpenUriPortal(this.client);
+  XdgOpenUriPortal(this._object, this._generateToken);
 
   /// Ask to open a URI.
   Future<void> openUri(String uri,
@@ -984,9 +985,9 @@ class XdgOpenUriPortal {
       bool? writable,
       bool? ask,
       String? activationToken}) async {
-    var request = XdgPortalRequest(client._object, () async {
+    var request = XdgPortalRequest(_object, () async {
       var options = <String, DBusValue>{};
-      options['handle_token'] = DBusString(client._generateToken());
+      options['handle_token'] = DBusString(_generateToken());
       if (writable != null) {
         options['writable'] = DBusBoolean(writable);
       }
@@ -996,7 +997,7 @@ class XdgOpenUriPortal {
       if (activationToken != null) {
         options['activation_token'] = DBusString(activationToken);
       }
-      var result = await client._object.callMethod(
+      var result = await _object.callMethod(
           'org.freedesktop.portal.OpenURI',
           'OpenURI',
           [
@@ -1017,15 +1018,14 @@ class XdgOpenUriPortal {
 
 /// Portal to use system proxy.
 class XdgProxyResolverPortal {
-  /// The client that is connected to this portal.
-  XdgDesktopPortalClient client;
+  final DBusRemoteObject _object;
 
-  XdgProxyResolverPortal(this.client);
+  XdgProxyResolverPortal(this._object);
 
   /// Looks up which proxy to use to connect to [uri].
   /// 'direct://' is returned when no proxy is needed.
   Future<List<String>> lookup(String uri) async {
-    var result = await client._object.callMethod(
+    var result = await _object.callMethod(
         'org.freedesktop.portal.ProxyResolver', 'Lookup', [DBusString(uri)],
         replySignature: DBusSignature('as'));
     return result.returnValues[0].asStringArray().toList();
@@ -1034,17 +1034,14 @@ class XdgProxyResolverPortal {
 
 /// Portal to access system settings.
 class XdgSettingsPortal {
-  /// The client that is connected to this portal.
-  XdgDesktopPortalClient client;
+  final DBusRemoteObject _object;
 
-  XdgSettingsPortal(this.client);
+  XdgSettingsPortal(this._object);
 
   /// Read a single value.
   Future<DBusValue> read(String namespace, String key) async {
-    var result = await client._object.callMethod(
-        'org.freedesktop.portal.Settings',
-        'Read',
-        [DBusString(namespace), DBusString(key)],
+    var result = await _object.callMethod('org.freedesktop.portal.Settings',
+        'Read', [DBusString(namespace), DBusString(key)],
         replySignature: DBusSignature('v'));
     return result.returnValues[0].asVariant();
   }
@@ -1053,10 +1050,8 @@ class XdgSettingsPortal {
   /// Globbing is allowed on trailing sections, e.g. 'com.example.*'.
   Future<Map<String, Map<String, DBusValue>>> readAll(
       Iterable<String> namespaces) async {
-    var result = await client._object.callMethod(
-        'org.freedesktop.portal.Settings',
-        'ReadAll',
-        [DBusArray.string(namespaces)],
+    var result = await _object.callMethod('org.freedesktop.portal.Settings',
+        'ReadAll', [DBusArray.string(namespaces)],
         replySignature: DBusSignature('a{sa{sv}}'));
     return result.returnValues[0].asDict().map(
         (key, value) => MapEntry(key.asString(), value.asStringVariantDict()));
@@ -1108,15 +1103,15 @@ class XdgDesktopPortalClient {
     _object = DBusRemoteObject(_bus,
         name: 'org.freedesktop.portal.Desktop',
         path: DBusObjectPath('/org/freedesktop/portal/desktop'));
-    account = XdgAccountPortal(this);
-    email = XdgEmailPortal(this);
-    fileChooser = XdgFileChooserPortal(this);
-    location = XdgLocationPortal(this);
-    networkMonitor = XdgNetworkMonitorPortal(this);
-    notification = XdgNotificationPortal(this);
-    openUri = XdgOpenUriPortal(this);
-    proxyResolver = XdgProxyResolverPortal(this);
-    settings = XdgSettingsPortal(this);
+    account = XdgAccountPortal(_object, _generateToken);
+    email = XdgEmailPortal(_object, _generateToken);
+    fileChooser = XdgFileChooserPortal(_object, _generateToken);
+    location = XdgLocationPortal(_object, _generateToken);
+    networkMonitor = XdgNetworkMonitorPortal(_object);
+    notification = XdgNotificationPortal(_object);
+    openUri = XdgOpenUriPortal(_object, _generateToken);
+    proxyResolver = XdgProxyResolverPortal(_object);
+    settings = XdgSettingsPortal(_object);
   }
 
   /// Terminates all active connections. If a client remains unclosed, the Dart process may not terminate.
