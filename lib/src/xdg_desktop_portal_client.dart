@@ -48,6 +48,66 @@ class _XdgPortalSession {
   }
 }
 
+/// Information about a user account.
+class XdgAccountUserInformation {
+  /// The user id.
+  final String id;
+
+  /// The users real name.
+  final String name;
+
+  /// The URI of an image file for the users avatar photo.
+  final String image;
+
+  XdgAccountUserInformation(
+      {required this.id, required this.name, required this.image});
+
+  @override
+  int get hashCode => Object.hash(id, name, image);
+
+  @override
+  bool operator ==(other) =>
+      other is XdgAccountUserInformation &&
+      other.id == id &&
+      other.name == name &&
+      other.image == image;
+
+  @override
+  String toString() => '$runtimeType(id: $id, name: $name, image: $image)';
+}
+
+/// Portal for obtaining information about the use
+class XdgAccountPortal {
+  /// The client that is connected to this portal.
+  XdgDesktopPortalClient client;
+  XdgAccountPortal(this.client);
+
+  Stream<XdgAccountUserInformation> getUserInformation(
+      {String parentWindow = '', String reason = ''}) {
+    var request = XdgPortalRequest(
+      (XdgPortalRequest request) async {
+        var options = <String, DBusValue>{};
+        options['handle_token'] = DBusString(client._generateToken());
+        options['reason'] = DBusString(reason);
+        var result = await client._object.callMethod(
+            'org.freedesktop.portal.Account',
+            'GetUserInformation',
+            [DBusString(parentWindow), DBusDict.stringVariant(options)],
+            replySignature: DBusSignature('o'));
+        return client._addRequest(
+            result.returnValues[0].asObjectPath(), request);
+      },
+    );
+    return request.stream.map(
+      (result) => XdgAccountUserInformation(
+        id: result['id']?.asString() ?? '',
+        name: result['name']?.asString() ?? '',
+        image: result['image']?.asString() ?? '',
+      ),
+    );
+  }
+}
+
 /// Portal to send email.
 class XdgEmailPortal {
   /// The client that is connected to this portal.
@@ -1059,6 +1119,9 @@ class XdgDesktopPortalClient {
   final _requests = <DBusObjectPath, XdgPortalRequest>{};
   final _sessions = <DBusObjectPath, _XdgPortalSession>{};
 
+  /// Portal for obtaining information about the user.
+  late final XdgAccountPortal account;
+
   /// Portal to send email.
   late final XdgEmailPortal email;
 
@@ -1114,6 +1177,7 @@ class XdgDesktopPortalClient {
         session._handleClosed();
       }
     });
+    account = XdgAccountPortal(this);
     email = XdgEmailPortal(this);
     fileChooser = XdgFileChooserPortal(this);
     location = XdgLocationPortal(this);
