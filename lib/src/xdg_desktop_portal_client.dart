@@ -25,6 +25,7 @@ class _XdgPortalRequest {
 
   final Future<DBusObjectPath> Function() _send;
   late final StreamController<Map<String, DBusValue>> _controller;
+  final _listenCompleter = Completer();
   late final DBusRemoteObject _object;
   var _haveResponse = false;
 
@@ -39,9 +40,13 @@ class _XdgPortalRequest {
     _object =
         DBusRemoteObject(client._bus, name: client._object.name, path: path);
     client._addRequest(path, this);
+    _listenCompleter.complete();
   }
 
   Future<void> _onCancel() async {
+    // Ensure that we have started the stream
+    await _listenCompleter.future;
+
     // If got a response, then the request object has already been removed.
     if (!_haveResponse) {
       try {
