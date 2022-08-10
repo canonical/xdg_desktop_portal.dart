@@ -1,84 +1,10 @@
 import 'dart:async';
 import 'dart:math';
 import 'dart:typed_data';
+
 import 'package:dbus/dbus.dart';
 
-/// Exception thrown when a portal request fails due to it being cancelled.
-class XdgPortalRequestCancelledException implements Exception {
-  @override
-  String toString() => 'Request was cancelled';
-}
-
-/// Exception thrown when a portal request fails.
-class XdgPortalRequestFailedException implements Exception {
-  @override
-  String toString() => 'Request failed';
-}
-
-/// A request sent to a portal.
-class _XdgPortalRequest {
-  /// The client that is the request is from.
-  XdgDesktopPortalClient client;
-
-  /// Stream containing the single result returned from the portal.
-  Stream<Map<String, DBusValue>> get stream => _controller.stream;
-
-  final Future<DBusObjectPath> Function() _send;
-  late final StreamController<Map<String, DBusValue>> _controller;
-  final _listenCompleter = Completer();
-  late final DBusRemoteObject _object;
-  var _haveResponse = false;
-
-  _XdgPortalRequest(this.client, this._send) {
-    _controller = StreamController<Map<String, DBusValue>>(
-        onListen: _onListen, onCancel: _onCancel);
-  }
-
-  /// Send the request.
-  Future<void> _onListen() async {
-    var path = await _send();
-    _object =
-        DBusRemoteObject(client._bus, name: client._object.name, path: path);
-    client._addRequest(path, this);
-    _listenCompleter.complete();
-  }
-
-  Future<void> _onCancel() async {
-    // Ensure that we have started the stream
-    await _listenCompleter.future;
-
-    // If got a response, then the request object has already been removed.
-    if (!_haveResponse) {
-      try {
-        await _object.callMethod('org.freedesktop.portal.Request', 'Close', [],
-            replySignature: DBusSignature(''));
-      } on DBusMethodResponseException {
-        // Ignore errors, as the request may have completed before the close request was received.
-      }
-    }
-  }
-
-  void _handleResponse(
-      _XdgPortalResponse response, Map<String, DBusValue> result) {
-    _haveResponse = true;
-    switch (response) {
-      case _XdgPortalResponse.success:
-        _controller.add(result);
-        return;
-      case _XdgPortalResponse.cancelled:
-        _controller.addError(XdgPortalRequestCancelledException());
-        break;
-      case _XdgPortalResponse.other:
-      default:
-        _controller.addError(XdgPortalRequestFailedException());
-        break;
-    }
-    _controller.close();
-  }
-}
-
-/// Response from a portal request.
-enum _XdgPortalResponse { success, cancelled, other }
+import 'xdg_portal_request.dart';
 
 /// A session opened on a portal.
 abstract class _XdgPortalSession extends DBusRemoteObject {
@@ -111,7 +37,7 @@ class XdgEmailPortal {
       Iterable<String> bcc = const [],
       String? subject,
       String? body}) async {
-    var request = _XdgPortalRequest(client, () async {
+    var request = XdgPortalRequest((XdgPortalRequest request) async {
       var options = <String, DBusValue>{};
       options['handle_token'] = DBusString(client._generateToken());
       if (address != null) {
@@ -137,7 +63,7 @@ class XdgEmailPortal {
           'ComposeEmail',
           [DBusString(parentWindow), DBusDict.stringVariant(options)],
           replySignature: DBusSignature('o'));
-      return result.returnValues[0].asObjectPath();
+      return client._addRequest(result.returnValues[0].asObjectPath(), request);
     });
     await request.stream.first;
   }
@@ -354,7 +280,7 @@ class XdgFileChooserPortal {
       Iterable<XdgFileChooserFilter> filters = const [],
       XdgFileChooserFilter? currentFilter,
       Iterable<XdgFileChooserChoice> choices = const []}) {
-    var request = _XdgPortalRequest(client, () async {
+    var request = XdgPortalRequest((XdgPortalRequest request) async {
       var options = <String, DBusValue>{};
       options['handle_token'] = DBusString(client._generateToken());
       if (acceptLabel != null) {
@@ -387,7 +313,7 @@ class XdgFileChooserPortal {
             DBusDict.stringVariant(options)
           ],
           replySignature: DBusSignature('o'));
-      return result.returnValues[0].asObjectPath();
+      return client._addRequest(result.returnValues[0].asObjectPath(), request);
     });
     return request.stream.map((result) {
       var urisValue = result['uris'];
@@ -414,7 +340,7 @@ class XdgFileChooserPortal {
       String? currentName,
       Uint8List? currentFolder,
       Uint8List? currentFile}) {
-    var request = _XdgPortalRequest(client, () async {
+    var request = XdgPortalRequest((XdgPortalRequest request) async {
       var options = <String, DBusValue>{};
       options['handle_token'] = DBusString(client._generateToken());
       if (acceptLabel != null) {
@@ -450,7 +376,7 @@ class XdgFileChooserPortal {
             DBusDict.stringVariant(options)
           ],
           replySignature: DBusSignature('o'));
-      return result.returnValues[0].asObjectPath();
+      return client._addRequest(result.returnValues[0].asObjectPath(), request);
     });
     return request.stream.map((result) {
       var urisValue = result['uris'];
@@ -474,7 +400,7 @@ class XdgFileChooserPortal {
       Iterable<XdgFileChooserChoice> choices = const [],
       Uint8List? currentFolder,
       Iterable<Uint8List> files = const []}) {
-    var request = _XdgPortalRequest(client, () async {
+    var request = XdgPortalRequest((XdgPortalRequest request) async {
       var options = <String, DBusValue>{};
       options['handle_token'] = DBusString(client._generateToken());
       if (acceptLabel != null) {
@@ -502,7 +428,7 @@ class XdgFileChooserPortal {
             DBusDict.stringVariant(options)
           ],
           replySignature: DBusSignature('o'));
-      return result.returnValues[0].asObjectPath();
+      return client._addRequest(result.returnValues[0].asObjectPath(), request);
     });
     return request.stream.map((result) {
       var urisValue = result['uris'];
@@ -863,15 +789,16 @@ class _XdgLocationSession extends _XdgPortalSession {
       : super(portalClient, path);
 
   /// Start this session.
-  Future<_XdgPortalRequest> start({String parentWindow = ''}) async {
-    var request = _XdgPortalRequest(portalClient, () async {
+  Future<XdgPortalRequest> start({String parentWindow = ''}) async {
+    var request = XdgPortalRequest((XdgPortalRequest request) async {
       var options = <String, DBusValue>{};
       var result = await portalClient._object.callMethod(
           'org.freedesktop.portal.Location',
           'Start',
           [path, DBusString(parentWindow), DBusDict.stringVariant(options)],
           replySignature: DBusSignature('o'));
-      return result.returnValues[0].asObjectPath();
+      return portalClient._addRequest(
+          result.returnValues[0].asObjectPath(), request);
     });
     return request;
   }
@@ -1027,7 +954,7 @@ class XdgOpenUriPortal {
       bool? writable,
       bool? ask,
       String? activationToken}) async {
-    var request = _XdgPortalRequest(client, () async {
+    var request = XdgPortalRequest((XdgPortalRequest request) async {
       var options = <String, DBusValue>{};
       options['handle_token'] = DBusString(client._generateToken());
       if (writable != null) {
@@ -1048,7 +975,7 @@ class XdgOpenUriPortal {
             DBusDict.stringVariant(options)
           ],
           replySignature: DBusSignature('o'));
-      return result.returnValues[0].asObjectPath();
+      return client._addRequest(result.returnValues[0].asObjectPath(), request);
     });
     await request.stream.first;
   }
@@ -1117,7 +1044,7 @@ class XdgDesktopPortalClient {
   late final StreamSubscription _requestResponseSubscription;
   late final StreamSubscription _sessionClosedSubscription;
 
-  final _requests = <DBusObjectPath, _XdgPortalRequest>{};
+  final _requests = <DBusObjectPath, XdgPortalRequest>{};
   final _sessions = <DBusObjectPath, _XdgPortalSession>{};
 
   /// Portal to send email.
@@ -1161,13 +1088,7 @@ class XdgDesktopPortalClient {
     _requestResponseSubscription = requestResponse.listen((signal) {
       var request = _requests.remove(signal.path);
       if (request != null) {
-        request._handleResponse(
-            {
-                  0: _XdgPortalResponse.success,
-                  1: _XdgPortalResponse.cancelled,
-                  2: _XdgPortalResponse.other
-                }[signal.values[0].asUint32()] ??
-                _XdgPortalResponse.other,
+        request.handleResponse(signal.values[0].asUint32(),
             signal.values[1].asStringVariantDict());
       }
     });
@@ -1214,8 +1135,10 @@ class XdgDesktopPortalClient {
   }
 
   /// Record an active portal request.
-  void _addRequest(DBusObjectPath path, _XdgPortalRequest request) {
+  DBusRemoteObject _addRequest(DBusObjectPath path, XdgPortalRequest request) {
+    var object = DBusRemoteObject(_bus, name: _object.name, path: path);
     _requests[path] = request;
+    return object;
   }
 
   /// Record an active portal session.
