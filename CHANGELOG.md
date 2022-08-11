@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.10
+
+* Add Background portal.
+* Add Camera portal.
+* Expose request exceptions in the API.
+* Add getVersion() methods for each portal.
+* Fix requests not being closed after a response.
+
 ## 0.1.9
 
 * Add Account portal.
