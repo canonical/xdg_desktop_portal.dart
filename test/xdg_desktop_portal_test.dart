@@ -41,10 +41,8 @@ class MockCamera {
   MockCamera(this.options);
 
   @override
-  int get hashCode => Object.hash(
-      '',
-      Object.hashAll(
-          options.entries.map((entry) => Object.hash(entry.key, entry.value))));
+  int get hashCode => Object.hashAll(
+      options.entries.map((entry) => Object.hash(entry.key, entry.value)));
 
   @override
   bool operator ==(other) {
