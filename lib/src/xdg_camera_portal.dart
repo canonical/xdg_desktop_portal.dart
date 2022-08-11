@@ -18,7 +18,7 @@ class XdgCameraPortal {
       .then((v) => v.asUint32());
 
   /// Request to gain access to the camera.
-  Stream<void> accessCamera() {
+  Future<void> accessCamera() async {
     var request = XdgPortalRequest(_object, () async {
       var options = <String, DBusValue>{};
       options['handle_token'] = DBusString(_generateToken());
@@ -30,7 +30,7 @@ class XdgCameraPortal {
       );
       return result.returnValues[0].asObjectPath();
     });
-    return request.stream;
+    await request.stream.first;
   }
 
   /// Open a file descriptor to the PipeWire remote where the camera nodes are available.
