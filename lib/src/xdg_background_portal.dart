@@ -4,10 +4,10 @@ import 'xdg_portal_request.dart';
 
 /// Result of a request asking for an allowed to run in the background.
 class XdgBackgroundPortalRequestResult {
-  /// TRUE if the application is allowed to run in the background.
+  /// true if the application is allowed to run in the background.
   final bool background;
 
-  /// TRUE if the application is will be autostarted.
+  /// true if the application is will be autostarted.
   final bool autostart;
 
   XdgBackgroundPortalRequestResult(
