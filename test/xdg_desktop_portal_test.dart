@@ -863,7 +863,7 @@ void main() {
 
     expect(await client.camera.getVersion(), equals(1));
 
-    await client.camera.accessCamera().first;
+    await client.camera.accessCamera();
     expect(portalServer.camera, equals([MockCamera({})]));
   });
 
