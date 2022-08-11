@@ -30,13 +30,14 @@ class XdgAccountUserInformation {
   String toString() => '$runtimeType(id: $id, name: $name, image: $image)';
 }
 
-/// Portal for obtaining information about the use
+/// Portal for obtaining information about the user.
 class XdgAccountPortal {
   final DBusRemoteObject _object;
   final String Function() _generateToken;
 
   XdgAccountPortal(this._object, this._generateToken);
 
+  /// Gets information about the user.
   Stream<XdgAccountUserInformation> getUserInformation(
       {String parentWindow = '', String reason = ''}) {
     var request = XdgPortalRequest(
