@@ -5,6 +5,7 @@ import 'package:dbus/dbus.dart';
 
 import 'xdg_account_portal.dart';
 import 'xdg_background_portal.dart';
+import 'xdg_camera_portal.dart';
 import 'xdg_email_portal.dart';
 import 'xdg_file_chooser_portal.dart';
 import 'xdg_network_monitor_portal.dart';
@@ -27,6 +28,9 @@ class XdgDesktopPortalClient {
 
   /// Portal for requesting autostart and background activity.
   late final XdgBackgroundPortal background;
+
+  /// Camera portal.
+  late final XdgCameraPortal camera;
 
   /// Portal to send email.
   late final XdgEmailPortal email;
@@ -64,6 +68,7 @@ class XdgDesktopPortalClient {
         path: DBusObjectPath('/org/freedesktop/portal/desktop'));
     account = XdgAccountPortal(_object, _generateToken);
     background = XdgBackgroundPortal(_object, _generateToken);
+    camera = XdgCameraPortal(_object, _generateToken);
     email = XdgEmailPortal(_object, _generateToken);
     fileChooser = XdgFileChooserPortal(_object, _generateToken);
     location = XdgLocationPortal(_object, _generateToken);
