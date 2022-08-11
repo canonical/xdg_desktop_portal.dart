@@ -35,6 +35,32 @@ class MockAccountDialog {
   String toString() => '$runtimeType($parentWindow, $options)';
 }
 
+class MockBackground {
+  final String parentWindow;
+  final Map<String, DBusValue> options;
+
+  MockBackground(this.parentWindow, this.options);
+
+  @override
+  int get hashCode => Object.hash(
+      parentWindow,
+      Object.hashAll(
+          options.entries.map((entry) => Object.hash(entry.key, entry.value))));
+
+  @override
+  bool operator ==(other) {
+    if (identical(this, other)) return true;
+    final mapEquals = const DeepCollectionEquality().equals;
+
+    return other is MockBackground &&
+        other.parentWindow == parentWindow &&
+        mapEquals(other.options, options);
+  }
+
+  @override
+  String toString() => '$runtimeType($parentWindow, $options)';
+}
+
 class MockCamera {
   final Map<String, DBusValue> options;
 
@@ -233,6 +259,8 @@ class MockPortalObject extends DBusObject {
     switch (methodCall.interface) {
       case 'org.freedesktop.portal.Account':
         return handleAccountMethodCall(methodCall);
+      case 'org.freedesktop.portal.Background':
+        return handleBackgroundMethodCall(methodCall);
       case 'org.freedesktop.portal.Camera':
         return handleCameraMethodCall(methodCall);
       case 'org.freedesktop.portal.Email':
@@ -282,6 +310,31 @@ class MockPortalObject extends DBusObject {
                     'image': DBusString(server.userImage!),
                   }));
         }
+        return DBusMethodSuccessResponse([request.path]);
+      default:
+        return DBusMethodErrorResponse.unknownMethod();
+    }
+  }
+
+  Future<DBusMethodResponse> handleBackgroundMethodCall(
+      DBusMethodCall methodCall) async {
+    switch (methodCall.name) {
+      case 'RequestBackground':
+        var parentWindow = methodCall.values[0].asString();
+        var options = methodCall.values[1].asStringVariantDict();
+        server.background.add(MockBackground(parentWindow, options));
+        var token =
+            options['handle_token']?.asString() ?? server.generateToken();
+        options.removeWhere((key, value) => key == 'handle_token');
+        var request = await server.addRequest(methodCall.sender, token);
+        Future.delayed(
+            Duration.zero,
+            () async => await request.respond(result: {
+                  'background': DBusBoolean(true),
+                  'autostart':
+                      DBusBoolean(options['autostart']?.asBoolean() ?? false),
+                }));
+
         return DBusMethodSuccessResponse([request.path]);
       default:
         return DBusMethodErrorResponse.unknownMethod();
@@ -689,6 +742,7 @@ class MockPortalServer extends DBusClient {
   int networkConnectivity;
 
   final accountDialogs = <MockAccountDialog>[];
+  final background = <MockBackground>[];
   final camera = <MockCamera>[];
   final composedEmails = <MockEmail>[];
   final openedUris = <MockUri>[];
@@ -839,6 +893,66 @@ void main() {
           id: 'alice',
           name: 'alice',
           image: 'file://home/me/image.png',
+        ).hashCode));
+  });
+
+  test('background', () async {
+    var server = DBusServer();
+    var clientAddress =
+        await server.listenAddress(DBusAddress.unix(dir: Directory.systemTemp));
+    addTearDown(() async {
+      await server.close();
+    });
+
+    var portalServer = MockPortalServer(clientAddress);
+    await portalServer.start();
+    addTearDown(() async {
+      await portalServer.close();
+    });
+
+    var client = XdgDesktopPortalClient(bus: DBusClient(clientAddress));
+    addTearDown(() async {
+      await client.close();
+    });
+
+    var result = await client.background
+        .requestBackground(
+          parentWindow: 'x11:12345',
+          reason: 'Allow your application to run in the background.',
+          autostart: true,
+          commandLine: ['gedit'],
+          dBusActivatable: false,
+        )
+        .first;
+    expect(
+        portalServer.background,
+        equals([
+          MockBackground('x11:12345', {
+            'reason':
+                DBusString('Allow your application to run in the background.'),
+            'autostart': DBusBoolean(true),
+            'commandline': DBusArray.string(['gedit']),
+            'dbus-activatable': DBusBoolean(false),
+          })
+        ]));
+    expect(
+      result,
+      equals(
+        XdgBackgroundPortalRequestResult(
+          background: true,
+          autostart: true,
+        ),
+      ),
+    );
+    expect(
+        result.toString(),
+        equals(
+            'XdgBackgroundPortalRequestResult(background: true, autostart: true)'));
+    expect(
+        result.hashCode,
+        equals(XdgBackgroundPortalRequestResult(
+          background: true,
+          autostart: true,
         ).hashCode));
   });
 

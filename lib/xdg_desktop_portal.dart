@@ -1,4 +1,5 @@
 export 'src/xdg_account_portal.dart';
+export 'src/xdg_background_portal.dart';
 export 'src/xdg_desktop_portal_client.dart';
 export 'src/xdg_email_portal.dart';
 export 'src/xdg_file_chooser_portal.dart';
