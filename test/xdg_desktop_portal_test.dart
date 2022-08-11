@@ -539,6 +539,124 @@ class MockPortalObject extends DBusObject {
         return DBusMethodErrorResponse.unknownMethod();
     }
   }
+
+  @override
+  Future<DBusMethodResponse> getProperty(String interface, String name) async {
+    switch (interface) {
+      case 'org.freedesktop.portal.Account':
+        return getAccountProperty(name);
+      case 'org.freedesktop.portal.Camera':
+        return getCameraProperty(name);
+      case 'org.freedesktop.portal.Email':
+        return getEmailProperty(name);
+      case 'org.freedesktop.portal.FileChooser':
+        return getFileChooserProperty(name);
+      case 'org.freedesktop.portal.Location':
+        return getLocationProperty(name);
+      case 'org.freedesktop.portal.NetworkMonitor':
+        return getNetworkMonitorProperty(name);
+      case 'org.freedesktop.portal.Notification':
+        return getNotificationProperty(name);
+      case 'org.freedesktop.portal.OpenURI':
+        return getOpenURIProperty(name);
+      case 'org.freedesktop.portal.ProxyResolver':
+        return getProxyResolverProperty(name);
+      case 'org.freedesktop.portal.Settings':
+        return getSettingsProperty(name);
+      default:
+        return DBusMethodErrorResponse.unknownProperty();
+    }
+  }
+
+  Future<DBusMethodResponse> getAccountProperty(String name) async {
+    switch (name) {
+      case 'version':
+        return DBusGetPropertyResponse(DBusUint32(1));
+      default:
+        return DBusMethodErrorResponse.unknownProperty();
+    }
+  }
+
+  Future<DBusMethodResponse> getCameraProperty(String name) async {
+    switch (name) {
+      case 'version':
+        return DBusGetPropertyResponse(DBusUint32(1));
+      default:
+        return DBusMethodErrorResponse.unknownProperty();
+    }
+  }
+
+  Future<DBusMethodResponse> getEmailProperty(String name) async {
+    switch (name) {
+      case 'version':
+        return DBusGetPropertyResponse(DBusUint32(3));
+      default:
+        return DBusMethodErrorResponse.unknownProperty();
+    }
+  }
+
+  Future<DBusMethodResponse> getFileChooserProperty(String name) async {
+    switch (name) {
+      case 'version':
+        return DBusGetPropertyResponse(DBusUint32(1));
+      default:
+        return DBusMethodErrorResponse.unknownProperty();
+    }
+  }
+
+  Future<DBusMethodResponse> getLocationProperty(String name) async {
+    switch (name) {
+      case 'version':
+        return DBusGetPropertyResponse(DBusUint32(1));
+      default:
+        return DBusMethodErrorResponse.unknownProperty();
+    }
+  }
+
+  Future<DBusMethodResponse> getNetworkMonitorProperty(String name) async {
+    switch (name) {
+      case 'version':
+        return DBusGetPropertyResponse(DBusUint32(3));
+      default:
+        return DBusMethodErrorResponse.unknownProperty();
+    }
+  }
+
+  Future<DBusMethodResponse> getNotificationProperty(String name) async {
+    switch (name) {
+      case 'version':
+        return DBusGetPropertyResponse(DBusUint32(1));
+      default:
+        return DBusMethodErrorResponse.unknownProperty();
+    }
+  }
+
+  Future<DBusMethodResponse> getOpenURIProperty(String name) async {
+    switch (name) {
+      case 'version':
+        return DBusGetPropertyResponse(DBusUint32(3));
+      default:
+        return DBusMethodErrorResponse.unknownProperty();
+    }
+  }
+
+  Future<DBusMethodResponse> getProxyResolverProperty(String name) async {
+    switch (name) {
+      case 'version':
+        return DBusGetPropertyResponse(DBusUint32(1));
+      default:
+        return DBusMethodErrorResponse.unknownProperty();
+    }
+  }
+
+  Future<DBusMethodResponse> getSettingsProperty(String name) async {
+    switch (name) {
+      case 'version':
+        return DBusGetPropertyResponse(DBusUint32(1));
+      default:
+        return DBusMethodErrorResponse.unknownProperty();
+    }
+  }
 }
 
 class MockRequestResponse {
@@ -685,6 +803,8 @@ void main() {
       await client.close();
     });
 
+    expect(await client.account.getVersion(), equals(1));
+
     var userInformation = await client.account
         .getUserInformation(
             parentWindow: 'x11:12345',
@@ -741,6 +861,8 @@ void main() {
       await client.close();
     });
 
+    expect(await client.camera.getVersion(), equals(1));
+
     await client.camera.accessCamera().first;
     expect(portalServer.camera, equals([MockCamera({})]));
   });
@@ -787,6 +909,8 @@ void main() {
       await client.close();
     });
 
+    expect(await client.email.getVersion(), equals(3));
+
     await client.email.composeEmail(
         parentWindow: 'x11:12345',
         address: 'alice@example.com',
@@ -831,6 +955,8 @@ void main() {
     addTearDown(() async {
       await client.close();
     });
+
+    expect(await client.fileChooser.getVersion(), equals(1));
 
     var result = await client.fileChooser.openFile(title: 'Open File').first;
     expect(portalServer.openFileDialogs,
@@ -1408,6 +1534,8 @@ void main() {
       await client.close();
     });
 
+    expect(await client.location.getVersion(), equals(1));
+
     var locations = client.location.createSession(
         distanceThreshold: 1,
         timeThreshold: 10,
@@ -1594,6 +1722,8 @@ void main() {
       await client.close();
     });
 
+    expect(await client.networkMonitor.getVersion(), equals(3));
+
     expect(
         client.networkMonitor.status,
         emitsInOrder([
@@ -1656,6 +1786,8 @@ void main() {
     addTearDown(() async {
       await client.close();
     });
+
+    expect(await client.notification.getVersion(), equals(1));
 
     await client.notification.addNotification('123',
         title: 'Title',
@@ -1872,6 +2004,8 @@ void main() {
       await client.close();
     });
 
+    expect(await client.openUri.getVersion(), equals(3));
+
     await client.openUri.openUri('http://example.com',
         parentWindow: 'x11:12345',
         writable: true,
@@ -1909,6 +2043,8 @@ void main() {
       await client.close();
     });
 
+    expect(await client.proxyResolver.getVersion(), equals(1));
+
     expect(await client.proxyResolver.lookup('http://example.com'),
         equals(['http://localhost:1234']));
   });
@@ -1933,6 +2069,8 @@ void main() {
     addTearDown(() async {
       await client.close();
     });
+
+    expect(await client.settings.getVersion(), equals(1));
 
     expect(await client.settings.read('com.example.test', 'name'),
         equals(DBusString('Fred')));

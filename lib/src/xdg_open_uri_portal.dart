@@ -9,6 +9,12 @@ class XdgOpenUriPortal {
 
   XdgOpenUriPortal(this._object, this._generateToken);
 
+  /// Get the version of this portal.
+  Future<int> getVersion() => _object
+      .getProperty('org.freedesktop.portal.OpenURI', 'version',
+          signature: DBusSignature('u'))
+      .then((v) => v.asUint32());
+
   /// Ask to open a URI.
   Future<void> openUri(String uri,
       {String parentWindow = '',
