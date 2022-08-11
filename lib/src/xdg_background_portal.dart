@@ -34,6 +34,12 @@ class XdgBackgroundPortal {
 
   XdgBackgroundPortal(this._object, this._generateToken);
 
+  /// Get the version of this portal.
+  Future<int> getVersion() => _object
+      .getProperty('org.freedesktop.portal.Background', 'version',
+          signature: DBusSignature('u'))
+      .then((v) => v.asUint32());
+
   /// Ask to request that the application is allowed to run in the background.
   Stream<XdgBackgroundPortalRequestResult> requestBackground({
     String parentWindow = '',
