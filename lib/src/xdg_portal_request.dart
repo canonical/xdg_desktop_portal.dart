@@ -2,17 +2,7 @@ import 'dart:async';
 
 import 'package:dbus/dbus.dart';
 
-/// Exception thrown when a portal request fails due to it being cancelled.
-class XdgPortalRequestCancelledException implements Exception {
-  @override
-  String toString() => 'Request was cancelled';
-}
-
-/// Exception thrown when a portal request fails.
-class XdgPortalRequestFailedException implements Exception {
-  @override
-  String toString() => 'Request failed';
-}
+import 'xdg_portal_request_exception.dart';
 
 /// A request sent to a portal.
 /// This class is used by portal implementations, it should not be required for normal portal API usage.
