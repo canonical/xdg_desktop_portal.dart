@@ -57,6 +57,12 @@ class XdgNotificationPortal {
 
   XdgNotificationPortal(this._object);
 
+  /// Get the version of this portal.
+  Future<int> getVersion() => _object
+      .getProperty('org.freedesktop.portal.Notification', 'version',
+          signature: DBusSignature('u'))
+      .then((v) => v.asUint32());
+
   /// Send a notification.
   /// [id] can be used later to withdraw the notification with [removeNotification].
   /// If [id] is reused without withdrawing, the existing notification is replaced.

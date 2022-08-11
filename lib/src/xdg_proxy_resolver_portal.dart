@@ -6,6 +6,12 @@ class XdgProxyResolverPortal {
 
   XdgProxyResolverPortal(this._object);
 
+  /// Get the version of this portal.
+  Future<int> getVersion() => _object
+      .getProperty('org.freedesktop.portal.ProxyResolver', 'version',
+          signature: DBusSignature('u'))
+      .then((v) => v.asUint32());
+
   /// Looks up which proxy to use to connect to [uri].
   /// 'direct://' is returned when no proxy is needed.
   Future<List<String>> lookup(String uri) async {

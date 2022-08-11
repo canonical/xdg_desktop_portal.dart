@@ -11,6 +11,12 @@ class XdgCameraPortal {
 
   XdgCameraPortal(this._object, this._generateToken);
 
+  /// Get the version of this portal.
+  Future<int> getVersion() => _object
+      .getProperty('org.freedesktop.portal.Camera', 'version',
+          signature: DBusSignature('u'))
+      .then((v) => v.asUint32());
+
   /// Request to gain access to the camera.
   Stream<void> accessCamera() {
     var request = XdgPortalRequest(_object, () async {

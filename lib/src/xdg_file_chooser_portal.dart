@@ -241,6 +241,12 @@ class XdgFileChooserPortal {
 
   XdgFileChooserPortal(this._object, this._generateToken);
 
+  /// Get the version of this portal.
+  Future<int> getVersion() => _object
+      .getProperty('org.freedesktop.portal.FileChooser', 'version',
+          signature: DBusSignature('u'))
+      .then((v) => v.asUint32());
+
   /// Ask to open one or more files.
   Stream<XdgFileChooserPortalOpenFileResult> openFile(
       {required String title,

@@ -37,6 +37,12 @@ class XdgAccountPortal {
 
   XdgAccountPortal(this._object, this._generateToken);
 
+  /// Get the version of this portal.
+  Future<int> getVersion() => _object
+      .getProperty('org.freedesktop.portal.Account', 'version',
+          signature: DBusSignature('u'))
+      .then((v) => v.asUint32());
+
   /// Gets information about the user.
   Stream<XdgAccountUserInformation> getUserInformation(
       {String parentWindow = '', String reason = ''}) {

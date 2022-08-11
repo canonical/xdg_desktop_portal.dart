@@ -6,6 +6,12 @@ class XdgSettingsPortal {
 
   XdgSettingsPortal(this._object);
 
+  /// Get the version of this portal.
+  Future<int> getVersion() => _object
+      .getProperty('org.freedesktop.portal.Settings', 'version',
+          signature: DBusSignature('u'))
+      .then((v) => v.asUint32());
+
   /// Read a single value.
   Future<DBusValue> read(String namespace, String key) async {
     var result = await _object.callMethod('org.freedesktop.portal.Settings',
