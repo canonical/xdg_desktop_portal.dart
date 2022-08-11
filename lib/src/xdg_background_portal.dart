@@ -37,20 +37,28 @@ class XdgBackgroundPortal {
   /// Ask to request that the application is allowed to run in the background.
   Stream<XdgBackgroundPortalRequestResult> requestBackground({
     String parentWindow = '',
-    String reason = '',
-    bool autostart = false,
-    required List<String> commandLine,
-    bool dBusActivatable = false,
+    String? reason,
+    bool? autostart,
+    required List<String>? commandLine,
+    bool? dBusActivatable,
   }) {
     var request = XdgPortalRequest(
       _object,
       () async {
         var options = <String, DBusValue>{};
         options['handle_token'] = DBusString(_generateToken());
-        options['reason'] = DBusString(reason);
-        options['autostart'] = DBusBoolean(autostart);
-        options['commandline'] = DBusArray.string(commandLine);
-        options['dbus-activatable'] = DBusBoolean(dBusActivatable);
+        if (reason != null) {
+          options['reason'] = DBusString(reason);
+        }
+        if (autostart != null) {
+          options['autostart'] = DBusBoolean(autostart);
+        }
+        if (commandLine != null) {
+          options['commandline'] = DBusArray.string(commandLine);
+        }
+        if (dBusActivatable != null) {
+          options['dbus-activatable'] = DBusBoolean(dBusActivatable);
+        }
         var result = await _object.callMethod(
             'org.freedesktop.portal.Background',
             'RequestBackground',
