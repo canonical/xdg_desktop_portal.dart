@@ -1862,24 +1862,33 @@ void main() {
 
     expect(await client.networkMonitor.getVersion(), equals(3));
 
-    expect(
-        client.networkMonitor.status,
-        emitsInOrder([
-          XdgNetworkStatus(
-              available: true,
-              metered: true,
-              connectivity: XdgNetworkConnectivity.local),
-          XdgNetworkStatus(
-              available: false,
-              metered: false,
-              connectivity: XdgNetworkConnectivity.full),
-        ]));
+    var n = 0;
+    var done = Completer();
+    client.networkMonitor.status.listen((status) async {
+      if (n == 0) {
+        expect(
+            status,
+            equals(XdgNetworkStatus(
+                available: true,
+                metered: true,
+                connectivity: XdgNetworkConnectivity.local)));
+        await portalServer.setNetworkStatus(
+            available: false, metered: false, connectivity: 3);
+      } else if (n == 1) {
+        expect(
+            status,
+            equals(XdgNetworkStatus(
+                available: false,
+                metered: false,
+                connectivity: XdgNetworkConnectivity.full)));
+        done.complete();
+      } else {
+        assert(false);
+      }
+      n++;
+    });
 
-    // Ensure that the first value has been retrieved.
-    await busClient.ping();
-
-    await portalServer.setNetworkStatus(
-        available: false, metered: false, connectivity: 3);
+    await done.future;
   });
 
   test('network monitor - can reach', () async {
