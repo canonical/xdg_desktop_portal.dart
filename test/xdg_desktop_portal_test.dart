@@ -35,6 +35,29 @@ class MockAccountDialog {
   String toString() => '$runtimeType($parentWindow, $options)';
 }
 
+class MockCamera {
+  final Map<String, DBusValue> options;
+
+  MockCamera(this.options);
+
+  @override
+  int get hashCode => Object.hash(
+      '',
+      Object.hashAll(
+          options.entries.map((entry) => Object.hash(entry.key, entry.value))));
+
+  @override
+  bool operator ==(other) {
+    if (identical(this, other)) return true;
+    final mapEquals = const DeepCollectionEquality().equals;
+
+    return other is MockCamera && mapEquals(other.options, options);
+  }
+
+  @override
+  String toString() => '$runtimeType($options)';
+}
+
 class MockEmail {
   final String parentWindow;
   final Map<String, DBusValue> options;
@@ -212,6 +235,8 @@ class MockPortalObject extends DBusObject {
     switch (methodCall.interface) {
       case 'org.freedesktop.portal.Account':
         return handleAccountMethodCall(methodCall);
+      case 'org.freedesktop.portal.Camera':
+        return handleCameraMethodCall(methodCall);
       case 'org.freedesktop.portal.Email':
         return handleEmailMethodCall(methodCall);
       case 'org.freedesktop.portal.FileChooser':
@@ -260,6 +285,26 @@ class MockPortalObject extends DBusObject {
                   }));
         }
         return DBusMethodSuccessResponse([request.path]);
+      default:
+        return DBusMethodErrorResponse.unknownMethod();
+    }
+  }
+
+  Future<DBusMethodResponse> handleCameraMethodCall(
+      DBusMethodCall methodCall) async {
+    switch (methodCall.name) {
+      case 'AccessCamera':
+        var options = methodCall.values[0].asStringVariantDict();
+        server.camera.add(MockCamera(options));
+        var token =
+            options['handle_token']?.asString() ?? server.generateToken();
+        options.removeWhere((key, value) => key == 'handle_token');
+        var request = await server.addRequest(methodCall.sender, token);
+        Future.delayed(Duration.zero, () async => await request.respond());
+        return DBusMethodSuccessResponse([request.path]);
+      case 'OpenPipeWireRemote':
+        var handle = DBusUnixFd(ResourceHandle.fromStdin(stdin));
+        return DBusMethodSuccessResponse([handle]);
       default:
         return DBusMethodErrorResponse.unknownMethod();
     }
@@ -528,6 +573,7 @@ class MockPortalServer extends DBusClient {
   int networkConnectivity;
 
   final accountDialogs = <MockAccountDialog>[];
+  final camera = <MockCamera>[];
   final composedEmails = <MockEmail>[];
   final openedUris = <MockUri>[];
   final openFileDialogs = <MockDialog>[];
@@ -676,6 +722,52 @@ void main() {
           name: 'alice',
           image: 'file://home/me/image.png',
         ).hashCode));
+  });
+
+  test('camera access', () async {
+    var server = DBusServer();
+    var clientAddress =
+        await server.listenAddress(DBusAddress.unix(dir: Directory.systemTemp));
+    addTearDown(() async {
+      await server.close();
+    });
+
+    var portalServer = MockPortalServer(clientAddress);
+    await portalServer.start();
+    addTearDown(() async {
+      await portalServer.close();
+    });
+
+    var client = XdgDesktopPortalClient(bus: DBusClient(clientAddress));
+    addTearDown(() async {
+      await client.close();
+    });
+
+    await client.camera.accessCamera();
+    expect(portalServer.camera, equals([MockCamera({})]));
+  });
+
+  test('camera openPipeWire', () async {
+    var server = DBusServer();
+    var clientAddress =
+        await server.listenAddress(DBusAddress.unix(dir: Directory.systemTemp));
+    addTearDown(() async {
+      await server.close();
+    });
+
+    var portalServer = MockPortalServer(clientAddress);
+    await portalServer.start();
+    addTearDown(() async {
+      await portalServer.close();
+    });
+
+    var client = XdgDesktopPortalClient(bus: DBusClient(clientAddress));
+    addTearDown(() async {
+      await client.close();
+    });
+
+    var result = await client.camera.openPipeWireRemote();
+    expect(result, isNotNull);
   });
 
   test('email', () async {
