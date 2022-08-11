@@ -664,7 +664,7 @@ void main() {
       await client.close();
     });
 
-    var result = await client.account
+    var userInformation = await client.account
         .getUserInformation(
             parentWindow: 'x11:12345',
             reason:
@@ -679,7 +679,7 @@ void main() {
           })
         ]));
     expect(
-      result,
+      userInformation,
       equals(
         XdgAccountUserInformation(
           id: 'alice',
@@ -688,6 +688,10 @@ void main() {
         ),
       ),
     );
+    expect(
+        userInformation.toString(),
+        equals(
+            'XdgAccountUserInformation(id: alice, name: alice, image: file://home/me/image.png)'));
   });
 
   test('email', () async {
