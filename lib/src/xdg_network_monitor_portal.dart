@@ -5,6 +5,7 @@ import 'package:dbus/dbus.dart';
 /// Network connectivity states.
 enum XdgNetworkConnectivity { local, limited, portal, full }
 
+/// Current status of the network.
 class XdgNetworkStatus {
   /// true if the network is available.
   bool available;
