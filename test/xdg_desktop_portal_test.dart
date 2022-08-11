@@ -669,6 +669,13 @@ void main() {
         userInformation.toString(),
         equals(
             'XdgAccountUserInformation(id: alice, name: alice, image: file://home/me/image.png)'));
+    expect(
+        userInformation.hashCode,
+        equals(XdgAccountUserInformation(
+          id: 'alice',
+          name: 'alice',
+          image: 'file://home/me/image.png',
+        ).hashCode));
   });
 
   test('email', () async {
