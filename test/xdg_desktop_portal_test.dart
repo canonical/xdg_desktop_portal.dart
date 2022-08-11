@@ -299,11 +299,12 @@ class MockPortalObject extends DBusObject {
             onClosed: () async {
           server.openFileDialogs.remove(dialog);
         });
-        if (server.openFileUris != null) {
+        if (server.openFileResponse != null) {
           Future.delayed(
               Duration.zero,
               () async => await request.respond(
-                  result: {'uris': DBusArray.string(server.openFileUris!)}));
+                  response: server.openFileResponse!.response,
+                  result: server.openFileResponse!.result));
         }
         return DBusMethodSuccessResponse([request.path]);
       case 'SaveFile':
@@ -319,11 +320,12 @@ class MockPortalObject extends DBusObject {
             onClosed: () async {
           server.saveFileDialogs.remove(dialog);
         });
-        if (server.saveFileUris != null) {
+        if (server.saveFileResponse != null) {
           Future.delayed(
               Duration.zero,
               () async => await request.respond(
-                  result: {'uris': DBusArray.string(server.saveFileUris!)}));
+                  response: server.saveFileResponse!.response,
+                  result: server.saveFileResponse!.result));
         }
         return DBusMethodSuccessResponse([request.path]);
       case 'SaveFiles':
@@ -339,11 +341,12 @@ class MockPortalObject extends DBusObject {
             onClosed: () async {
           server.saveFilesDialogs.remove(dialog);
         });
-        if (server.saveFilesUris != null) {
+        if (server.saveFilesResponse != null) {
           Future.delayed(
               Duration.zero,
               () async => await request.respond(
-                  result: {'uris': DBusArray.string(server.saveFilesUris!)}));
+                  response: server.saveFilesResponse!.response,
+                  result: server.saveFilesResponse!.result));
         }
         return DBusMethodSuccessResponse([request.path]);
       default:
@@ -512,6 +515,13 @@ class MockPortalObject extends DBusObject {
   }
 }
 
+class MockRequestResponse {
+  final int response;
+  final Map<String, DBusValue> result;
+
+  MockRequestResponse(this.response, this.result);
+}
+
 class MockPortalServer extends DBusClient {
   late final MockPortalObject _root;
 
@@ -522,9 +532,9 @@ class MockPortalServer extends DBusClient {
   final String? userId;
   final String? userName;
   final String? userImage;
-  final List<String>? openFileUris;
-  final List<String>? saveFileUris;
-  final List<String>? saveFilesUris;
+  final MockRequestResponse? openFileResponse;
+  final MockRequestResponse? saveFileResponse;
+  final MockRequestResponse? saveFilesResponse;
   late final Map<String, Map<String, DBusValue>> notifications;
   final Map<String, List<String>> proxies;
   final Map<String, Map<String, DBusValue>> settingsValues;
@@ -553,9 +563,9 @@ class MockPortalServer extends DBusClient {
       {this.userId,
       this.userName,
       this.userImage,
-      this.openFileUris,
-      this.saveFileUris,
-      this.saveFilesUris,
+      this.openFileResponse,
+      this.saveFileResponse,
+      this.saveFilesResponse,
       Map<String, Map<String, DBusValue>>? notifications,
       this.proxies = const {},
       this.settingsValues = const {},
@@ -731,7 +741,9 @@ void main() {
     });
 
     var portalServer = MockPortalServer(clientAddress,
-        openFileUris: ['file://home/me/image.png']);
+        openFileResponse: MockRequestResponse(0, {
+          'uris': DBusArray.string(['file://home/me/image.png'])
+        }));
     await portalServer.start();
     addTearDown(() async {
       await portalServer.close();
@@ -757,7 +769,9 @@ void main() {
     });
 
     var portalServer = MockPortalServer(clientAddress,
-        openFileUris: ['file://home/me/image.png']);
+        openFileResponse: MockRequestResponse(0, {
+          'uris': DBusArray.string(['file://home/me/image.png'])
+        }));
     await portalServer.start();
     addTearDown(() async {
       await portalServer.close();
@@ -841,7 +855,9 @@ void main() {
     });
 
     var portalServer = MockPortalServer(clientAddress,
-        saveFileUris: ['file://home/me/image.png']);
+        saveFileResponse: MockRequestResponse(0, {
+          'uris': DBusArray.string(['file://home/me/image.png'])
+        }));
     await portalServer.start();
     addTearDown(() async {
       await portalServer.close();
@@ -867,7 +883,9 @@ void main() {
     });
 
     var portalServer = MockPortalServer(clientAddress,
-        saveFileUris: ['file://home/me/image.png']);
+        saveFileResponse: MockRequestResponse(0, {
+          'uris': DBusArray.string(['file://home/me/image.png'])
+        }));
     await portalServer.start();
     addTearDown(() async {
       await portalServer.close();
@@ -997,7 +1015,9 @@ void main() {
     });
 
     var portalServer = MockPortalServer(clientAddress,
-        saveFilesUris: ['file://home/me/image.png']);
+        saveFilesResponse: MockRequestResponse(0, {
+          'uris': DBusArray.string(['file://home/me/image.png'])
+        }));
     await portalServer.start();
     addTearDown(() async {
       await portalServer.close();
@@ -1023,7 +1043,9 @@ void main() {
     });
 
     var portalServer = MockPortalServer(clientAddress,
-        saveFilesUris: ['file://home/me/image.png']);
+        saveFilesResponse: MockRequestResponse(0, {
+          'uris': DBusArray.string(['file://home/me/image.png'])
+        }));
     await portalServer.start();
     addTearDown(() async {
       await portalServer.close();
@@ -1183,6 +1205,57 @@ void main() {
     // Ensure the dialog is removed when the request is cancelled.
     await subscription.cancel();
     expect(portalServer.openFileDialogs, hasLength(0));
+  });
+
+  test('file chooser - cancelled', () async {
+    var server = DBusServer();
+    var clientAddress =
+        await server.listenAddress(DBusAddress.unix(dir: Directory.systemTemp));
+    addTearDown(() async {
+      await server.close();
+    });
+
+    var portalServer = MockPortalServer(clientAddress,
+        openFileResponse: MockRequestResponse(1, {}));
+    await portalServer.start();
+    addTearDown(() async {
+      await portalServer.close();
+    });
+
+    var busClient = DBusClient(clientAddress);
+    var client = XdgDesktopPortalClient(bus: busClient);
+    addTearDown(() async {
+      await client.close();
+    });
+
+    var stream = client.fileChooser.openFile(title: 'Open File');
+    expect(
+        () => stream.first, throwsA(isA<XdgPortalRequestCancelledException>()));
+  });
+
+  test('file chooser - failed', () async {
+    var server = DBusServer();
+    var clientAddress =
+        await server.listenAddress(DBusAddress.unix(dir: Directory.systemTemp));
+    addTearDown(() async {
+      await server.close();
+    });
+
+    var portalServer = MockPortalServer(clientAddress,
+        openFileResponse: MockRequestResponse(2, {}));
+    await portalServer.start();
+    addTearDown(() async {
+      await portalServer.close();
+    });
+
+    var busClient = DBusClient(clientAddress);
+    var client = XdgDesktopPortalClient(bus: busClient);
+    addTearDown(() async {
+      await client.close();
+    });
+
+    var stream = client.fileChooser.openFile(title: 'Open File');
+    expect(() => stream.first, throwsA(isA<XdgPortalRequestFailedException>()));
   });
 
   test('location', () async {
