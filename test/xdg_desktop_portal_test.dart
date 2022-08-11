@@ -371,6 +371,7 @@ class MockPortalObject extends DBusObject {
       case 'Start':
         var path = methodCall.values[0].asObjectPath();
         var parentWindow = methodCall.values[1].asString();
+        var session = server.sessions[path];
         var locationSession = server._locationSessions[path];
         if (locationSession != null) {
           locationSession.parentWindow = parentWindow;
@@ -384,6 +385,9 @@ class MockPortalObject extends DBusObject {
           for (var location in server.locations) {
             await emitSignal('org.freedesktop.portal.Location',
                 'LocationUpdated', [path, DBusDict.stringVariant(location)]);
+          }
+          if (server.closeLocationSession) {
+            await server.removeSession(session!, emitClosed: true);
           }
         });
         return DBusMethodSuccessResponse([request.path]);
@@ -505,7 +509,7 @@ class MockPortalServer extends DBusClient {
   late final MockPortalObject _root;
 
   final requests = <MockPortalRequestObject>[];
-  final sessions = <MockPortalSessionObject>[];
+  final sessions = <DBusObjectPath, MockPortalSessionObject>{};
   final usedTokens = <String>{};
 
   final String? userId;
@@ -518,6 +522,7 @@ class MockPortalServer extends DBusClient {
   final Map<String, List<String>> proxies;
   final Map<String, Map<String, DBusValue>> settingsValues;
   final List<Map<String, DBusValue>> locations;
+  final bool closeLocationSession;
   bool networkAvailable;
   bool networkMetered;
   int networkConnectivity;
@@ -543,6 +548,7 @@ class MockPortalServer extends DBusClient {
       this.proxies = const {},
       this.settingsValues = const {},
       this.locations = const [],
+      this.closeLocationSession = false,
       this.networkAvailable = true,
       this.networkMetered = false,
       this.networkConnectivity = 3})
@@ -595,13 +601,17 @@ class MockPortalServer extends DBusClient {
 
   Future<MockPortalSessionObject> addSession(String token) async {
     var session = MockPortalSessionObject(this, token);
-    sessions.add(session);
+    sessions[session.path] = session;
     await registerObject(session);
     return session;
   }
 
-  Future<void> removeSession(MockPortalSessionObject session) async {
-    sessions.remove(session);
+  Future<void> removeSession(MockPortalSessionObject session,
+      {var emitClosed = false}) async {
+    if (emitClosed) {
+      await session.emitSignal('org.freedesktop.portal.Session', 'Closed');
+    }
+    sessions.remove(session.path);
     await unregisterObject(session);
   }
 }
