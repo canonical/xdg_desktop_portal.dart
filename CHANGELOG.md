@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.9
+
+* Add Account portal.
+
 ## 0.1.8
 
 * Add FileChooser portal.
