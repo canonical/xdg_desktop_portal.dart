@@ -43,7 +43,15 @@ class XdgPortalSession {
 
   Future<void> _onCancel() async {
     await _sessionClosedSubscription?.cancel();
-    await _object?.callMethod('org.freedesktop.portal.Session', 'Close', [],
-        replySignature: DBusSignature(''));
+
+    // Ensure that we have started the stream
+    await _createdCompleter.future;
+
+    try {
+      await _object?.callMethod('org.freedesktop.portal.Session', 'Close', [],
+          replySignature: DBusSignature(''));
+    } on DBusMethodResponseException {
+      // Ignore errors, as the request may have completed before the close request was received.
+    }
   }
 }
