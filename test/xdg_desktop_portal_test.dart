@@ -379,34 +379,13 @@ class MockPortalObject extends DBusObject {
         var token =
             options['handle_token']?.asString() ?? server.generateToken();
         var request = await server.addRequest(methodCall.sender, token);
-        Future.delayed(Duration.zero, () async => await request.respond());
-        var location = <String, DBusValue>{};
-        if (server.latitude != null) {
-          location['Latitude'] = DBusDouble(server.latitude!);
-        }
-        if (server.longitude != null) {
-          location['Longitude'] = DBusDouble(server.longitude!);
-        }
-        if (server.altitude != null) {
-          location['Altitude'] = DBusDouble(server.altitude!);
-        }
-        if (server.accuracy != null) {
-          location['Accuracy'] = DBusDouble(server.accuracy!);
-        }
-        if (server.speed != null) {
-          location['Speed'] = DBusDouble(server.speed!);
-        }
-        if (server.heading != null) {
-          location['Heading'] = DBusDouble(server.heading!);
-        }
-        if (server.locationTimestamp != null) {
-          location['Timestamp'] = DBusStruct([
-            DBusUint64(server.locationTimestamp! ~/ 1000000),
-            DBusUint64(server.locationTimestamp! % 1000000)
-          ]);
-        }
-        await emitSignal('org.freedesktop.portal.Location', 'LocationUpdated',
-            [path, DBusDict.stringVariant(location)]);
+        Future.delayed(Duration.zero, () async {
+          await request.respond();
+          for (var location in server.locations) {
+            await emitSignal('org.freedesktop.portal.Location',
+                'LocationUpdated', [path, DBusDict.stringVariant(location)]);
+          }
+        });
         return DBusMethodSuccessResponse([request.path]);
       default:
         return DBusMethodErrorResponse.unknownMethod();
@@ -538,13 +517,7 @@ class MockPortalServer extends DBusClient {
   late final Map<String, Map<String, DBusValue>> notifications;
   final Map<String, List<String>> proxies;
   final Map<String, Map<String, DBusValue>> settingsValues;
-  final double? latitude;
-  final double? longitude;
-  final double? altitude;
-  final double? accuracy;
-  final double? speed;
-  final double? heading;
-  final int? locationTimestamp;
+  final List<Map<String, DBusValue>> locations;
   bool networkAvailable;
   bool networkMetered;
   int networkConnectivity;
@@ -569,13 +542,7 @@ class MockPortalServer extends DBusClient {
       Map<String, Map<String, DBusValue>>? notifications,
       this.proxies = const {},
       this.settingsValues = const {},
-      this.latitude,
-      this.longitude,
-      this.altitude,
-      this.accuracy,
-      this.speed,
-      this.heading,
-      this.locationTimestamp,
+      this.locations = const [],
       this.networkAvailable = true,
       this.networkMetered = false,
       this.networkConnectivity = 3})
@@ -1313,14 +1280,17 @@ void main() {
       await server.close();
     });
 
-    var portalServer = MockPortalServer(clientAddress,
-        latitude: 40.9,
-        longitude: 174.9,
-        altitude: 42.0,
-        accuracy: 1.2,
-        speed: 28,
-        heading: 321.4,
-        locationTimestamp: 1658718568000000);
+    var portalServer = MockPortalServer(clientAddress, locations: [
+      <String, DBusValue>{
+        'Latitude': DBusDouble(40.9),
+        'Longitude': DBusDouble(174.9),
+        'Altitude': DBusDouble(42.0),
+        'Accuracy': DBusDouble(1.2),
+        'Speed': DBusDouble(28),
+        'Heading': DBusDouble(321.4),
+        'Timestamp': DBusStruct([DBusUint64(1658718568), DBusUint64(0)])
+      }
+    ]);
     await portalServer.start();
     addTearDown(() async {
       await portalServer.close();
@@ -1384,14 +1354,17 @@ void main() {
       await server.close();
     });
 
-    var portalServer = MockPortalServer(clientAddress,
-        latitude: 40.9,
-        longitude: 174.9,
-        altitude: 42.0,
-        accuracy: 1.2,
-        speed: 28,
-        heading: 321.4,
-        locationTimestamp: 1658718568000000);
+    var portalServer = MockPortalServer(clientAddress, locations: [
+      <String, DBusValue>{
+        'Latitude': DBusDouble(40.9),
+        'Longitude': DBusDouble(174.9),
+        'Altitude': DBusDouble(42.0),
+        'Accuracy': DBusDouble(1.2),
+        'Speed': DBusDouble(28),
+        'Heading': DBusDouble(321.4),
+        'Timestamp': DBusStruct([DBusUint64(1658718568), DBusUint64(0)])
+      }
+    ]);
     await portalServer.start();
     addTearDown(() async {
       await portalServer.close();
