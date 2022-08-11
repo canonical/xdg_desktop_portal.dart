@@ -11,6 +11,7 @@ import 'xdg_notification_portal.dart';
 import 'xdg_location_portal.dart';
 import 'xdg_open_uri_portal.dart';
 import 'xdg_proxy_resolver_portal.dart';
+import 'xdg_secret_portal.dart';
 import 'xdg_settings_portal.dart';
 
 /// A client that connects to the portals.
@@ -45,6 +46,9 @@ class XdgDesktopPortalClient {
   /// Portal to use system proxy.
   late final XdgProxyResolverPortal proxyResolver;
 
+  /// Portal for retrieving application secret.
+  late final XdgSecretPortal secret;
+
   /// Portal to access system settings.
   late final XdgSettingsPortal settings;
 
@@ -66,6 +70,7 @@ class XdgDesktopPortalClient {
     notification = XdgNotificationPortal(_object);
     openUri = XdgOpenUriPortal(_object, _generateToken);
     proxyResolver = XdgProxyResolverPortal(_object);
+    secret = XdgSecretPortal(_object, _generateToken);
     settings = XdgSettingsPortal(_object);
   }
 
