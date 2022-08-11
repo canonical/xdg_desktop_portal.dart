@@ -758,6 +758,8 @@ void main() {
     expect(portalServer.openFileDialogs,
         equals([MockDialog('', 'Open File', {})]));
     expect(result.uris, equals(['file://home/me/image.png']));
+    expect(result.choices, isEmpty);
+    expect(result.currentFilter, isNull);
   });
 
   test('file chooser - open file options', () async {
@@ -770,7 +772,17 @@ void main() {
 
     var portalServer = MockPortalServer(clientAddress,
         openFileResponse: MockRequestResponse(0, {
-          'uris': DBusArray.string(['file://home/me/image.png'])
+          'uris': DBusArray.string(['file://home/me/image.png']),
+          'choices': DBusArray(DBusSignature('(ss)'), [
+            DBusStruct([DBusString('color'), DBusString('green')])
+          ]),
+          'current_filter': DBusStruct([
+            DBusString('JPEG Image'),
+            DBusArray(DBusSignature('(us)'), [
+              DBusStruct([DBusUint32(0), DBusString('*.jpg')]),
+              DBusStruct([DBusUint32(1), DBusString('image/jpeg')])
+            ])
+          ])
         }));
     await portalServer.start();
     addTearDown(() async {
@@ -844,6 +856,13 @@ void main() {
           })
         ]));
     expect(result.uris, equals(['file://home/me/image.png']));
+    expect(result.choices, equals({'color': 'green'}));
+    expect(
+        result.currentFilter,
+        equals(XdgFileChooserFilter('JPEG Image', [
+          XdgFileChooserGlobPattern('*.jpg'),
+          XdgFileChooserMimeTypePattern('image/jpeg')
+        ])));
   });
 
   test('file chooser - save file', () async {
@@ -872,6 +891,8 @@ void main() {
     expect(portalServer.saveFileDialogs,
         equals([MockDialog('', 'Save File', {})]));
     expect(result.uris, equals(['file://home/me/image.png']));
+    expect(result.choices, isEmpty);
+    expect(result.currentFilter, isNull);
   });
 
   test('file chooser - save file options', () async {
@@ -884,7 +905,17 @@ void main() {
 
     var portalServer = MockPortalServer(clientAddress,
         saveFileResponse: MockRequestResponse(0, {
-          'uris': DBusArray.string(['file://home/me/image.png'])
+          'uris': DBusArray.string(['file://home/me/image.png']),
+          'choices': DBusArray(DBusSignature('(ss)'), [
+            DBusStruct([DBusString('color'), DBusString('green')])
+          ]),
+          'current_filter': DBusStruct([
+            DBusString('JPEG Image'),
+            DBusArray(DBusSignature('(us)'), [
+              DBusStruct([DBusUint32(0), DBusString('*.jpg')]),
+              DBusStruct([DBusUint32(1), DBusString('image/jpeg')])
+            ])
+          ])
         }));
     await portalServer.start();
     addTearDown(() async {
@@ -1004,6 +1035,13 @@ void main() {
           })
         ]));
     expect(result.uris, equals(['file://home/me/image.png']));
+    expect(result.choices, equals({'color': 'green'}));
+    expect(
+        result.currentFilter,
+        equals(XdgFileChooserFilter('JPEG Image', [
+          XdgFileChooserGlobPattern('*.jpg'),
+          XdgFileChooserMimeTypePattern('image/jpeg')
+        ])));
   });
 
   test('file chooser - save files', () async {
@@ -1032,6 +1070,7 @@ void main() {
     expect(portalServer.saveFilesDialogs,
         equals([MockDialog('', 'Save Files', {})]));
     expect(result.uris, equals(['file://home/me/image.png']));
+    expect(result.choices, isEmpty);
   });
 
   test('file chooser - save files options', () async {
@@ -1044,7 +1083,10 @@ void main() {
 
     var portalServer = MockPortalServer(clientAddress,
         saveFilesResponse: MockRequestResponse(0, {
-          'uris': DBusArray.string(['file://home/me/image.png'])
+          'uris': DBusArray.string(['file://home/me/image.png']),
+          'choices': DBusArray(DBusSignature('(ss)'), [
+            DBusStruct([DBusString('color'), DBusString('green')])
+          ])
         }));
     await portalServer.start();
     addTearDown(() async {
@@ -1173,6 +1215,7 @@ void main() {
           })
         ]));
     expect(result.uris, equals(['file://home/me/image.png']));
+    expect(result.choices, equals({'color': 'green'}));
   });
 
   test('file chooser - cancel', () async {

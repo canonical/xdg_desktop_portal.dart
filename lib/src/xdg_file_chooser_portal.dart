@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import 'package:collection/collection.dart';
 import 'package:dbus/dbus.dart';
 
 import 'xdg_portal_request.dart';
@@ -24,6 +25,16 @@ class XdgFileChooserGlobPattern extends XdgFileChooserFilterPattern {
   String get _pattern => pattern;
 
   XdgFileChooserGlobPattern(this.pattern);
+
+  @override
+  int get hashCode => pattern.hashCode;
+
+  @override
+  bool operator ==(other) =>
+      other is XdgFileChooserGlobPattern && other.pattern == pattern;
+
+  @override
+  String toString() => '$runtimeType($pattern)';
 }
 
 /// A pattern used to match files using a MIME type.
@@ -38,6 +49,16 @@ class XdgFileChooserMimeTypePattern extends XdgFileChooserFilterPattern {
   String get _pattern => mimeType;
 
   XdgFileChooserMimeTypePattern(this.mimeType);
+
+  @override
+  int get hashCode => mimeType.hashCode;
+
+  @override
+  bool operator ==(other) =>
+      other is XdgFileChooserMimeTypePattern && other.mimeType == mimeType;
+
+  @override
+  String toString() => '$runtimeType($mimeType)';
 }
 
 /// A file filter in use in a file chooser.
@@ -51,6 +72,22 @@ class XdgFileChooserFilter {
   XdgFileChooserFilter(
       this.name, Iterable<XdgFileChooserFilterPattern> patterns)
       : patterns = patterns.toList();
+
+  @override
+  int get hashCode => Object.hash(name, Object.hashAll(patterns));
+
+  @override
+  bool operator ==(other) {
+    if (identical(this, other)) return true;
+    final listEquals = const DeepCollectionEquality().equals;
+
+    return other is XdgFileChooserFilter &&
+        other.name == name &&
+        listEquals(other.patterns, patterns);
+  }
+
+  @override
+  String toString() => '$runtimeType($name, $patterns)';
 }
 
 XdgFileChooserFilter? _decodeFilter(DBusValue? value) {
@@ -154,13 +191,13 @@ Map<String, String> _decodeChoicesResult(DBusValue? value) {
 /// Result of a request for access to files.
 class XdgFileChooserPortalOpenFileResult {
   /// The URIs selected in the file chooser.
-  var uris = <String>[];
+  final List<String> uris;
 
   /// Result of the choices taken in the chooser.
-  Map<String, String> choices;
+  final Map<String, String> choices;
 
   /// Selected filter that was used in the chooser.
-  XdgFileChooserFilter? currentFilter;
+  final XdgFileChooserFilter? currentFilter;
 
   XdgFileChooserPortalOpenFileResult(
       {required this.uris,
@@ -171,13 +208,13 @@ class XdgFileChooserPortalOpenFileResult {
 /// Result of a request asking for a location to save a file.
 class XdgFileChooserPortalSaveFileResult {
   /// The URIs selected in the file chooser.
-  var uris = <String>[];
+  final List<String> uris;
 
   /// Result of the choices taken in the chooser.
-  Map<String, String> choices;
+  final Map<String, String> choices;
 
   /// Selected filter that was used in the chooser.
-  XdgFileChooserFilter? currentFilter;
+  final XdgFileChooserFilter? currentFilter;
 
   XdgFileChooserPortalSaveFileResult(
       {required this.uris,
@@ -188,10 +225,10 @@ class XdgFileChooserPortalSaveFileResult {
 /// Result of a request asking for a folder as a location to save one or more files.
 class XdgFileChooserPortalSaveFilesResult {
   /// The URIs selected in the file chooser.
-  var uris = <String>[];
+  final List<String> uris;
 
   /// Result of the choices taken in the chooser.
-  Map<String, String> choices;
+  final Map<String, String> choices;
 
   XdgFileChooserPortalSaveFilesResult(
       {required this.uris, this.choices = const {}});
