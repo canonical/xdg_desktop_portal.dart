@@ -1181,6 +1181,17 @@ void main() {
           XdgFileChooserGlobPattern('*.jpg'),
           XdgFileChooserMimeTypePattern('image/jpeg')
         ])));
+
+    expect(
+        result.currentFilter.toString(),
+        equals(
+            'XdgFileChooserFilter(JPEG Image, [XdgFileChooserGlobPattern(*.jpg), XdgFileChooserMimeTypePattern(image/jpeg)])'));
+    expect(
+        result.currentFilter.hashCode,
+        equals(XdgFileChooserFilter('JPEG Image', [
+          XdgFileChooserGlobPattern('*.jpg'),
+          XdgFileChooserMimeTypePattern('image/jpeg')
+        ]).hashCode));
   });
 
   test('file chooser - save file', () async {
