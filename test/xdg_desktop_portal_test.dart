@@ -598,6 +598,8 @@ class MockPortalObject extends DBusObject {
     switch (interface) {
       case 'org.freedesktop.portal.Account':
         return getAccountProperty(name);
+      case 'org.freedesktop.portal.Background':
+        return getBackgroundProperty(name);
       case 'org.freedesktop.portal.Camera':
         return getCameraProperty(name);
       case 'org.freedesktop.portal.Email':
@@ -622,6 +624,15 @@ class MockPortalObject extends DBusObject {
   }
 
   Future<DBusMethodResponse> getAccountProperty(String name) async {
+    switch (name) {
+      case 'version':
+        return DBusGetPropertyResponse(DBusUint32(1));
+      default:
+        return DBusMethodErrorResponse.unknownProperty();
+    }
+  }
+
+  Future<DBusMethodResponse> getBackgroundProperty(String name) async {
     switch (name) {
       case 'version':
         return DBusGetPropertyResponse(DBusUint32(1));
@@ -914,6 +925,8 @@ void main() {
     addTearDown(() async {
       await client.close();
     });
+
+    expect(await client.background.getVersion(), equals(1));
 
     var result = await client.background
         .requestBackground(
