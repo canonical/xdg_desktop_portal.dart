@@ -1407,6 +1407,75 @@ void main() {
     expect(portalServer.sessions, isEmpty);
   });
 
+  test('location - closed', () async {
+    var server = DBusServer();
+    var clientAddress =
+        await server.listenAddress(DBusAddress.unix(dir: Directory.systemTemp));
+    addTearDown(() async {
+      await server.close();
+    });
+
+    var portalServer = MockPortalServer(clientAddress,
+        locations: [
+          <String, DBusValue>{
+            'Latitude': DBusDouble(40.9),
+            'Longitude': DBusDouble(174.9),
+            'Altitude': DBusDouble(42.0),
+            'Accuracy': DBusDouble(1.2),
+            'Speed': DBusDouble(28),
+            'Heading': DBusDouble(321.4),
+            'Timestamp': DBusStruct([DBusUint64(1658718568), DBusUint64(0)])
+          },
+          <String, DBusValue>{
+            'Latitude': DBusDouble(40.9),
+            'Longitude': DBusDouble(174.9),
+            'Altitude': DBusDouble(45.1),
+            'Accuracy': DBusDouble(1.2),
+            'Speed': DBusDouble(42),
+            'Heading': DBusDouble(302.1),
+            'Timestamp': DBusStruct([DBusUint64(1658718569), DBusUint64(0)])
+          }
+        ],
+        closeLocationSession: true);
+    await portalServer.start();
+    addTearDown(() async {
+      await portalServer.close();
+    });
+
+    var busClient = DBusClient(clientAddress);
+    var client = XdgDesktopPortalClient(bus: busClient);
+    addTearDown(() async {
+      await client.close();
+    });
+
+    var locations = client.location.createSession(
+        distanceThreshold: 1,
+        timeThreshold: 10,
+        accuracy: XdgLocationAccuracy.street,
+        parentWindow: 'x11:12345');
+    expect(
+        locations,
+        emitsInOrder([
+          XdgLocation(
+              latitude: 40.9,
+              longitude: 174.9,
+              altitude: 42.0,
+              accuracy: 1.2,
+              speed: 28.0,
+              heading: 321.4,
+              timestamp: DateTime.fromMicrosecondsSinceEpoch(1658718568000000)),
+          XdgLocation(
+              latitude: 40.9,
+              longitude: 174.9,
+              altitude: 45.1,
+              accuracy: 1.2,
+              speed: 42.0,
+              heading: 302.1,
+              timestamp: DateTime.fromMicrosecondsSinceEpoch(1658718569000000)),
+          emitsDone
+        ]));
+  });
+
   test('network monitor - status', () async {
     var server = DBusServer();
     var clientAddress =
