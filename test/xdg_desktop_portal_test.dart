@@ -741,7 +741,7 @@ void main() {
       await client.close();
     });
 
-    await client.camera.accessCamera();
+    await client.camera.accessCamera().first;
     expect(portalServer.camera, equals([MockCamera({})]));
   });
 
