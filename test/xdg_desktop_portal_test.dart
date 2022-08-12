@@ -1618,6 +1618,40 @@ void main() {
         () => stream.first, throwsA(isA<XdgPortalRequestCancelledException>()));
   });
 
+  test('file chooser - empty result', () async {
+    var server = DBusServer();
+    var clientAddress =
+        await server.listenAddress(DBusAddress.unix(dir: Directory.systemTemp));
+    addTearDown(() async {
+      await server.close();
+    });
+
+    var portalServer = MockPortalServer(clientAddress,
+        openFileResponse: MockRequestResponse(0, {}),
+        saveFileResponse: MockRequestResponse(0, {}),
+        saveFilesResponse: MockRequestResponse(0, {}));
+    await portalServer.start();
+    addTearDown(() async {
+      await portalServer.close();
+    });
+
+    var busClient = DBusClient(clientAddress);
+    var client = XdgDesktopPortalClient(bus: busClient);
+    addTearDown(() async {
+      await client.close();
+    });
+
+    var openFileResult =
+        await client.fileChooser.openFile(title: 'Open File').first;
+    expect(openFileResult.uris, isEmpty);
+    var saveFileResult =
+        await client.fileChooser.saveFile(title: 'Save File').first;
+    expect(saveFileResult.uris, isEmpty);
+    var saveFilesResult =
+        await client.fileChooser.saveFiles(title: 'Save Files').first;
+    expect(saveFilesResult.uris, isEmpty);
+  });
+
   test('file chooser - failed', () async {
     var server = DBusServer();
     var clientAddress =
