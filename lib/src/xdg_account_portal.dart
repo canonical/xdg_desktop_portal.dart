@@ -30,21 +30,30 @@ class XdgAccountUserInformation {
   String toString() => '$runtimeType(id: $id, name: $name, image: $image)';
 }
 
-/// Portal for obtaining information about the use
+/// Portal for obtaining information about the user.
 class XdgAccountPortal {
   final DBusRemoteObject _object;
   final String Function() _generateToken;
 
   XdgAccountPortal(this._object, this._generateToken);
 
+  /// Get the version of this portal.
+  Future<int> getVersion() => _object
+      .getProperty('org.freedesktop.portal.Account', 'version',
+          signature: DBusSignature('u'))
+      .then((v) => v.asUint32());
+
+  /// Gets information about the user.
   Stream<XdgAccountUserInformation> getUserInformation(
-      {String parentWindow = '', String reason = ''}) {
+      {String parentWindow = '', String? reason}) {
     var request = XdgPortalRequest(
       _object,
       () async {
         var options = <String, DBusValue>{};
         options['handle_token'] = DBusString(_generateToken());
-        options['reason'] = DBusString(reason);
+        if (reason != null) {
+          options['reason'] = DBusString(reason);
+        }
         var result = await _object.callMethod(
             'org.freedesktop.portal.Account',
             'GetUserInformation',

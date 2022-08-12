@@ -191,6 +191,12 @@ class XdgLocationPortal {
 
   XdgLocationPortal(this._object, this._generateToken);
 
+  /// Get the version of this portal.
+  Future<int> getVersion() => _object
+      .getProperty('org.freedesktop.portal.Location', 'version',
+          signature: DBusSignature('u'))
+      .then((v) => v.asUint32());
+
   /// Create a location session that returns a stream of location updates from the portal.
   /// When the session is no longer required close the stream.
   Stream<XdgLocation> createSession(

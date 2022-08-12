@@ -9,6 +9,12 @@ class XdgEmailPortal {
 
   XdgEmailPortal(this._object, this._generateToken);
 
+  /// Get the version of this portal.
+  Future<int> getVersion() => _object
+      .getProperty('org.freedesktop.portal.Email', 'version',
+          signature: DBusSignature('u'))
+      .then((v) => v.asUint32());
+
   /// Present a window to compose an email.
   Future<void> composeEmail(
       {String parentWindow = '',

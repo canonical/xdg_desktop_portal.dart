@@ -81,6 +81,12 @@ class XdgNetworkMonitorPortal {
         signature: DBusSignature(''));
   }
 
+  /// Get the version of this portal.
+  Future<int> getVersion() => _object
+      .getProperty('org.freedesktop.portal.NetworkMonitor', 'version',
+          signature: DBusSignature('u'))
+      .then((v) => v.asUint32());
+
   /// Get network status updates.
   Stream<XdgNetworkStatus> get status {
     var controller = _NetworkStatusStreamController(this);

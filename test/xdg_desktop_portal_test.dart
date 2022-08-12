@@ -35,6 +35,53 @@ class MockAccountDialog {
   String toString() => '$runtimeType($parentWindow, $options)';
 }
 
+class MockBackground {
+  final String parentWindow;
+  final Map<String, DBusValue> options;
+
+  MockBackground(this.parentWindow, this.options);
+
+  @override
+  int get hashCode => Object.hash(
+      parentWindow,
+      Object.hashAll(
+          options.entries.map((entry) => Object.hash(entry.key, entry.value))));
+
+  @override
+  bool operator ==(other) {
+    if (identical(this, other)) return true;
+    final mapEquals = const DeepCollectionEquality().equals;
+
+    return other is MockBackground &&
+        other.parentWindow == parentWindow &&
+        mapEquals(other.options, options);
+  }
+
+  @override
+  String toString() => '$runtimeType($parentWindow, $options)';
+}
+
+class MockCamera {
+  final Map<String, DBusValue> options;
+
+  MockCamera(this.options);
+
+  @override
+  int get hashCode => Object.hashAll(
+      options.entries.map((entry) => Object.hash(entry.key, entry.value)));
+
+  @override
+  bool operator ==(other) {
+    if (identical(this, other)) return true;
+    final mapEquals = const DeepCollectionEquality().equals;
+
+    return other is MockCamera && mapEquals(other.options, options);
+  }
+
+  @override
+  String toString() => '$runtimeType($options)';
+}
+
 class MockEmail {
   final String parentWindow;
   final Map<String, DBusValue> options;
@@ -212,6 +259,10 @@ class MockPortalObject extends DBusObject {
     switch (methodCall.interface) {
       case 'org.freedesktop.portal.Account':
         return handleAccountMethodCall(methodCall);
+      case 'org.freedesktop.portal.Background':
+        return handleBackgroundMethodCall(methodCall);
+      case 'org.freedesktop.portal.Camera':
+        return handleCameraMethodCall(methodCall);
       case 'org.freedesktop.portal.Email':
         return handleEmailMethodCall(methodCall);
       case 'org.freedesktop.portal.FileChooser':
@@ -260,6 +311,51 @@ class MockPortalObject extends DBusObject {
                   }));
         }
         return DBusMethodSuccessResponse([request.path]);
+      default:
+        return DBusMethodErrorResponse.unknownMethod();
+    }
+  }
+
+  Future<DBusMethodResponse> handleBackgroundMethodCall(
+      DBusMethodCall methodCall) async {
+    switch (methodCall.name) {
+      case 'RequestBackground':
+        var parentWindow = methodCall.values[0].asString();
+        var options = methodCall.values[1].asStringVariantDict();
+        server.background.add(MockBackground(parentWindow, options));
+        var token =
+            options['handle_token']?.asString() ?? server.generateToken();
+        options.removeWhere((key, value) => key == 'handle_token');
+        var request = await server.addRequest(methodCall.sender, token);
+        Future.delayed(
+            Duration.zero,
+            () async => await request.respond(result: {
+                  'background': DBusBoolean(true),
+                  'autostart':
+                      DBusBoolean(options['autostart']?.asBoolean() ?? false),
+                }));
+
+        return DBusMethodSuccessResponse([request.path]);
+      default:
+        return DBusMethodErrorResponse.unknownMethod();
+    }
+  }
+
+  Future<DBusMethodResponse> handleCameraMethodCall(
+      DBusMethodCall methodCall) async {
+    switch (methodCall.name) {
+      case 'AccessCamera':
+        var options = methodCall.values[0].asStringVariantDict();
+        server.camera.add(MockCamera(options));
+        var token =
+            options['handle_token']?.asString() ?? server.generateToken();
+        options.removeWhere((key, value) => key == 'handle_token');
+        var request = await server.addRequest(methodCall.sender, token);
+        Future.delayed(Duration.zero, () async => await request.respond());
+        return DBusMethodSuccessResponse([request.path]);
+      case 'OpenPipeWireRemote':
+        var handle = DBusUnixFd(ResourceHandle.fromStdin(stdin));
+        return DBusMethodSuccessResponse([handle]);
       default:
         return DBusMethodErrorResponse.unknownMethod();
     }
@@ -496,6 +592,135 @@ class MockPortalObject extends DBusObject {
         return DBusMethodErrorResponse.unknownMethod();
     }
   }
+
+  @override
+  Future<DBusMethodResponse> getProperty(String interface, String name) async {
+    switch (interface) {
+      case 'org.freedesktop.portal.Account':
+        return getAccountProperty(name);
+      case 'org.freedesktop.portal.Background':
+        return getBackgroundProperty(name);
+      case 'org.freedesktop.portal.Camera':
+        return getCameraProperty(name);
+      case 'org.freedesktop.portal.Email':
+        return getEmailProperty(name);
+      case 'org.freedesktop.portal.FileChooser':
+        return getFileChooserProperty(name);
+      case 'org.freedesktop.portal.Location':
+        return getLocationProperty(name);
+      case 'org.freedesktop.portal.NetworkMonitor':
+        return getNetworkMonitorProperty(name);
+      case 'org.freedesktop.portal.Notification':
+        return getNotificationProperty(name);
+      case 'org.freedesktop.portal.OpenURI':
+        return getOpenURIProperty(name);
+      case 'org.freedesktop.portal.ProxyResolver':
+        return getProxyResolverProperty(name);
+      case 'org.freedesktop.portal.Settings':
+        return getSettingsProperty(name);
+      default:
+        return DBusMethodErrorResponse.unknownProperty();
+    }
+  }
+
+  Future<DBusMethodResponse> getAccountProperty(String name) async {
+    switch (name) {
+      case 'version':
+        return DBusGetPropertyResponse(DBusUint32(1));
+      default:
+        return DBusMethodErrorResponse.unknownProperty();
+    }
+  }
+
+  Future<DBusMethodResponse> getBackgroundProperty(String name) async {
+    switch (name) {
+      case 'version':
+        return DBusGetPropertyResponse(DBusUint32(1));
+      default:
+        return DBusMethodErrorResponse.unknownProperty();
+    }
+  }
+
+  Future<DBusMethodResponse> getCameraProperty(String name) async {
+    switch (name) {
+      case 'version':
+        return DBusGetPropertyResponse(DBusUint32(1));
+      default:
+        return DBusMethodErrorResponse.unknownProperty();
+    }
+  }
+
+  Future<DBusMethodResponse> getEmailProperty(String name) async {
+    switch (name) {
+      case 'version':
+        return DBusGetPropertyResponse(DBusUint32(3));
+      default:
+        return DBusMethodErrorResponse.unknownProperty();
+    }
+  }
+
+  Future<DBusMethodResponse> getFileChooserProperty(String name) async {
+    switch (name) {
+      case 'version':
+        return DBusGetPropertyResponse(DBusUint32(1));
+      default:
+        return DBusMethodErrorResponse.unknownProperty();
+    }
+  }
+
+  Future<DBusMethodResponse> getLocationProperty(String name) async {
+    switch (name) {
+      case 'version':
+        return DBusGetPropertyResponse(DBusUint32(1));
+      default:
+        return DBusMethodErrorResponse.unknownProperty();
+    }
+  }
+
+  Future<DBusMethodResponse> getNetworkMonitorProperty(String name) async {
+    switch (name) {
+      case 'version':
+        return DBusGetPropertyResponse(DBusUint32(3));
+      default:
+        return DBusMethodErrorResponse.unknownProperty();
+    }
+  }
+
+  Future<DBusMethodResponse> getNotificationProperty(String name) async {
+    switch (name) {
+      case 'version':
+        return DBusGetPropertyResponse(DBusUint32(1));
+      default:
+        return DBusMethodErrorResponse.unknownProperty();
+    }
+  }
+
+  Future<DBusMethodResponse> getOpenURIProperty(String name) async {
+    switch (name) {
+      case 'version':
+        return DBusGetPropertyResponse(DBusUint32(3));
+      default:
+        return DBusMethodErrorResponse.unknownProperty();
+    }
+  }
+
+  Future<DBusMethodResponse> getProxyResolverProperty(String name) async {
+    switch (name) {
+      case 'version':
+        return DBusGetPropertyResponse(DBusUint32(1));
+      default:
+        return DBusMethodErrorResponse.unknownProperty();
+    }
+  }
+
+  Future<DBusMethodResponse> getSettingsProperty(String name) async {
+    switch (name) {
+      case 'version':
+        return DBusGetPropertyResponse(DBusUint32(1));
+      default:
+        return DBusMethodErrorResponse.unknownProperty();
+    }
+  }
 }
 
 class MockRequestResponse {
@@ -528,6 +753,8 @@ class MockPortalServer extends DBusClient {
   int networkConnectivity;
 
   final accountDialogs = <MockAccountDialog>[];
+  final background = <MockBackground>[];
+  final camera = <MockCamera>[];
   final composedEmails = <MockEmail>[];
   final openedUris = <MockUri>[];
   final openFileDialogs = <MockDialog>[];
@@ -641,6 +868,8 @@ void main() {
       await client.close();
     });
 
+    expect(await client.account.getVersion(), equals(1));
+
     var userInformation = await client.account
         .getUserInformation(
             parentWindow: 'x11:12345',
@@ -678,6 +907,116 @@ void main() {
         ).hashCode));
   });
 
+  test('background', () async {
+    var server = DBusServer();
+    var clientAddress =
+        await server.listenAddress(DBusAddress.unix(dir: Directory.systemTemp));
+    addTearDown(() async {
+      await server.close();
+    });
+
+    var portalServer = MockPortalServer(clientAddress);
+    await portalServer.start();
+    addTearDown(() async {
+      await portalServer.close();
+    });
+
+    var client = XdgDesktopPortalClient(bus: DBusClient(clientAddress));
+    addTearDown(() async {
+      await client.close();
+    });
+
+    expect(await client.background.getVersion(), equals(1));
+
+    var result = await client.background
+        .requestBackground(
+          parentWindow: 'x11:12345',
+          reason: 'Allow your application to run in the background.',
+          autostart: true,
+          commandLine: ['gedit'],
+          dBusActivatable: false,
+        )
+        .first;
+    expect(
+        portalServer.background,
+        equals([
+          MockBackground('x11:12345', {
+            'reason':
+                DBusString('Allow your application to run in the background.'),
+            'autostart': DBusBoolean(true),
+            'commandline': DBusArray.string(['gedit']),
+            'dbus-activatable': DBusBoolean(false),
+          })
+        ]));
+    expect(
+      result,
+      equals(
+        XdgBackgroundPortalRequestResult(
+          background: true,
+          autostart: true,
+        ),
+      ),
+    );
+    expect(
+        result.toString(),
+        equals(
+            'XdgBackgroundPortalRequestResult(background: true, autostart: true)'));
+    expect(
+        result.hashCode,
+        equals(XdgBackgroundPortalRequestResult(
+          background: true,
+          autostart: true,
+        ).hashCode));
+  });
+
+  test('camera access', () async {
+    var server = DBusServer();
+    var clientAddress =
+        await server.listenAddress(DBusAddress.unix(dir: Directory.systemTemp));
+    addTearDown(() async {
+      await server.close();
+    });
+
+    var portalServer = MockPortalServer(clientAddress);
+    await portalServer.start();
+    addTearDown(() async {
+      await portalServer.close();
+    });
+
+    var client = XdgDesktopPortalClient(bus: DBusClient(clientAddress));
+    addTearDown(() async {
+      await client.close();
+    });
+
+    expect(await client.camera.getVersion(), equals(1));
+
+    await client.camera.accessCamera();
+    expect(portalServer.camera, equals([MockCamera({})]));
+  });
+
+  test('camera openPipeWire', () async {
+    var server = DBusServer();
+    var clientAddress =
+        await server.listenAddress(DBusAddress.unix(dir: Directory.systemTemp));
+    addTearDown(() async {
+      await server.close();
+    });
+
+    var portalServer = MockPortalServer(clientAddress);
+    await portalServer.start();
+    addTearDown(() async {
+      await portalServer.close();
+    });
+
+    var client = XdgDesktopPortalClient(bus: DBusClient(clientAddress));
+    addTearDown(() async {
+      await client.close();
+    });
+
+    var result = await client.camera.openPipeWireRemote();
+    expect(result, isNotNull);
+  });
+
   test('email', () async {
     var server = DBusServer();
     var clientAddress =
@@ -696,6 +1035,8 @@ void main() {
     addTearDown(() async {
       await client.close();
     });
+
+    expect(await client.email.getVersion(), equals(3));
 
     await client.email.composeEmail(
         parentWindow: 'x11:12345',
@@ -741,6 +1082,8 @@ void main() {
     addTearDown(() async {
       await client.close();
     });
+
+    expect(await client.fileChooser.getVersion(), equals(1));
 
     var result = await client.fileChooser.openFile(title: 'Open File').first;
     expect(portalServer.openFileDialogs,
@@ -851,6 +1194,17 @@ void main() {
           XdgFileChooserGlobPattern('*.jpg'),
           XdgFileChooserMimeTypePattern('image/jpeg')
         ])));
+
+    expect(
+        result.currentFilter.toString(),
+        equals(
+            'XdgFileChooserFilter(JPEG Image, [XdgFileChooserGlobPattern(*.jpg), XdgFileChooserMimeTypePattern(image/jpeg)])'));
+    expect(
+        result.currentFilter.hashCode,
+        equals(XdgFileChooserFilter('JPEG Image', [
+          XdgFileChooserGlobPattern('*.jpg'),
+          XdgFileChooserMimeTypePattern('image/jpeg')
+        ]).hashCode));
   });
 
   test('file chooser - save file', () async {
@@ -1264,6 +1618,40 @@ void main() {
         () => stream.first, throwsA(isA<XdgPortalRequestCancelledException>()));
   });
 
+  test('file chooser - empty result', () async {
+    var server = DBusServer();
+    var clientAddress =
+        await server.listenAddress(DBusAddress.unix(dir: Directory.systemTemp));
+    addTearDown(() async {
+      await server.close();
+    });
+
+    var portalServer = MockPortalServer(clientAddress,
+        openFileResponse: MockRequestResponse(0, {}),
+        saveFileResponse: MockRequestResponse(0, {}),
+        saveFilesResponse: MockRequestResponse(0, {}));
+    await portalServer.start();
+    addTearDown(() async {
+      await portalServer.close();
+    });
+
+    var busClient = DBusClient(clientAddress);
+    var client = XdgDesktopPortalClient(bus: busClient);
+    addTearDown(() async {
+      await client.close();
+    });
+
+    var openFileResult =
+        await client.fileChooser.openFile(title: 'Open File').first;
+    expect(openFileResult.uris, isEmpty);
+    var saveFileResult =
+        await client.fileChooser.saveFile(title: 'Save File').first;
+    expect(saveFileResult.uris, isEmpty);
+    var saveFilesResult =
+        await client.fileChooser.saveFiles(title: 'Save Files').first;
+    expect(saveFilesResult.uris, isEmpty);
+  });
+
   test('file chooser - failed', () async {
     var server = DBusServer();
     var clientAddress =
@@ -1317,6 +1705,8 @@ void main() {
     addTearDown(() async {
       await client.close();
     });
+
+    expect(await client.location.getVersion(), equals(1));
 
     var locations = client.location.createSession(
         distanceThreshold: 1,
@@ -1504,24 +1894,49 @@ void main() {
       await client.close();
     });
 
-    expect(
-        client.networkMonitor.status,
-        emitsInOrder([
-          XdgNetworkStatus(
-              available: true,
-              metered: true,
-              connectivity: XdgNetworkConnectivity.local),
-          XdgNetworkStatus(
-              available: false,
-              metered: false,
-              connectivity: XdgNetworkConnectivity.full),
-        ]));
+    expect(await client.networkMonitor.getVersion(), equals(3));
 
-    // Ensure that the first value has been retrieved.
-    await busClient.ping();
+    var n = 0;
+    var done = Completer();
+    var s = client.networkMonitor.status.listen((status) async {
+      if (n == 0) {
+        expect(
+            status,
+            equals(XdgNetworkStatus(
+                available: true,
+                metered: true,
+                connectivity: XdgNetworkConnectivity.local)));
 
-    await portalServer.setNetworkStatus(
-        available: false, metered: false, connectivity: 3);
+        expect(
+            status.toString(),
+            equals(
+                'XdgNetworkStatus(available: true, metered: true, connectivity: XdgNetworkConnectivity.local)'));
+        expect(
+            status.hashCode,
+            equals(XdgNetworkStatus(
+                    available: true,
+                    metered: true,
+                    connectivity: XdgNetworkConnectivity.local)
+                .hashCode));
+
+        await portalServer.setNetworkStatus(
+            available: false, metered: false, connectivity: 3);
+      } else if (n == 1) {
+        expect(
+            status,
+            equals(XdgNetworkStatus(
+                available: false,
+                metered: false,
+                connectivity: XdgNetworkConnectivity.full)));
+        done.complete();
+      } else {
+        assert(false);
+      }
+      n++;
+    });
+
+    await done.future;
+    await s.cancel();
   });
 
   test('network monitor - can reach', () async {
@@ -1566,6 +1981,8 @@ void main() {
     addTearDown(() async {
       await client.close();
     });
+
+    expect(await client.notification.getVersion(), equals(1));
 
     await client.notification.addNotification('123',
         title: 'Title',
@@ -1782,6 +2199,8 @@ void main() {
       await client.close();
     });
 
+    expect(await client.openUri.getVersion(), equals(3));
+
     await client.openUri.openUri('http://example.com',
         parentWindow: 'x11:12345',
         writable: true,
@@ -1819,6 +2238,8 @@ void main() {
       await client.close();
     });
 
+    expect(await client.proxyResolver.getVersion(), equals(1));
+
     expect(await client.proxyResolver.lookup('http://example.com'),
         equals(['http://localhost:1234']));
   });
@@ -1843,6 +2264,8 @@ void main() {
     addTearDown(() async {
       await client.close();
     });
+
+    expect(await client.settings.getVersion(), equals(1));
 
     expect(await client.settings.read('com.example.test', 'name'),
         equals(DBusString('Fred')));

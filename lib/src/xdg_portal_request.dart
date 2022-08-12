@@ -62,7 +62,7 @@ class XdgPortalRequest {
     switch (response) {
       case 0:
         _controller.add(result);
-        return;
+        break;
       case 1:
         _controller.addError(XdgPortalRequestCancelledException());
         break;
