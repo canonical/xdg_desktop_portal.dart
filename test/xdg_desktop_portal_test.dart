@@ -108,6 +108,27 @@ class MockEmail {
   String toString() => '$runtimeType($parentWindow, $options)';
 }
 
+class MockSecret {
+  final Map<String, DBusValue> options;
+
+  MockSecret(this.options);
+
+  @override
+  int get hashCode => Object.hashAll(
+      options.entries.map((entry) => Object.hash(entry.key, entry.value)));
+
+  @override
+  bool operator ==(other) {
+    if (identical(this, other)) return true;
+    final mapEquals = const DeepCollectionEquality().equals;
+
+    return other is MockSecret && mapEquals(other.options, options);
+  }
+
+  @override
+  String toString() => '$runtimeType($options)';
+}
+
 class MockUri {
   final String parentWindow;
   final String uri;
@@ -277,6 +298,8 @@ class MockPortalObject extends DBusObject {
         return handleOpenURIMethodCall(methodCall);
       case 'org.freedesktop.portal.ProxyResolver':
         return handleProxyResolverMethodCall(methodCall);
+      case 'org.freedesktop.portal.Secret':
+        return handleSecretMethodCall(methodCall);
       case 'org.freedesktop.portal.Settings':
         return handleSettingsMethodCall(methodCall);
       default:
@@ -562,6 +585,23 @@ class MockPortalObject extends DBusObject {
     }
   }
 
+  Future<DBusMethodResponse> handleSecretMethodCall(
+      DBusMethodCall methodCall) async {
+    switch (methodCall.name) {
+      case 'RetrieveSecret':
+        var options = methodCall.values[1].asStringVariantDict();
+        server.secret.add(MockSecret(options));
+        var token =
+            options['handle_token']?.asString() ?? server.generateToken();
+        options.removeWhere((key, value) => key == 'handle_token');
+        var request = await server.addRequest(methodCall.sender, token);
+        Future.delayed(Duration.zero, () async => await request.respond());
+        return DBusMethodSuccessResponse([request.path]);
+      default:
+        return DBusMethodErrorResponse.unknownMethod();
+    }
+  }
+
   Future<DBusMethodResponse> handleSettingsMethodCall(
       DBusMethodCall methodCall) async {
     switch (methodCall.name) {
@@ -616,6 +656,8 @@ class MockPortalObject extends DBusObject {
         return getOpenURIProperty(name);
       case 'org.freedesktop.portal.ProxyResolver':
         return getProxyResolverProperty(name);
+      case 'org.freedesktop.portal.Secret':
+        return getSecretProperty(name);
       case 'org.freedesktop.portal.Settings':
         return getSettingsProperty(name);
       default:
@@ -713,6 +755,15 @@ class MockPortalObject extends DBusObject {
     }
   }
 
+  Future<DBusMethodResponse> getSecretProperty(String name) async {
+    switch (name) {
+      case 'version':
+        return DBusGetPropertyResponse(DBusUint32(1));
+      default:
+        return DBusMethodErrorResponse.unknownProperty();
+    }
+  }
+
   Future<DBusMethodResponse> getSettingsProperty(String name) async {
     switch (name) {
       case 'version':
@@ -760,6 +811,7 @@ class MockPortalServer extends DBusClient {
   final openFileDialogs = <MockDialog>[];
   final saveFileDialogs = <MockDialog>[];
   final saveFilesDialogs = <MockDialog>[];
+  final secret = <MockSecret>[];
   Iterable<MockLocationSession> get locationSessions =>
       _locationSessions.values;
   final _locationSessions = <DBusObjectPath, MockLocationSession>{};
@@ -2242,6 +2294,41 @@ void main() {
 
     expect(await client.proxyResolver.lookup('http://example.com'),
         equals(['http://localhost:1234']));
+  });
+
+  test('secret', () async {
+    var server = DBusServer();
+    var clientAddress =
+        await server.listenAddress(DBusAddress.unix(dir: Directory.systemTemp));
+    addTearDown(() async {
+      await server.close();
+    });
+
+    var portalServer = MockPortalServer(clientAddress);
+    await portalServer.start();
+    addTearDown(() async {
+      await portalServer.close();
+    });
+
+    var client = XdgDesktopPortalClient(bus: DBusClient(clientAddress));
+    addTearDown(() async {
+      await client.close();
+    });
+
+    expect(await client.secret.getVersion(), equals(1));
+
+    var dir = Directory.systemTemp.createTempSync();
+    var file = await File('${dir.path}/MASTER_SECRETE').create();
+    var accessFile = await file.open(mode: FileMode.write);
+    await client.secret.retrieveSecret(accessFile);
+    accessFile.setPositionSync(0);
+    final length = accessFile.lengthSync();
+    final secret = accessFile.readSync(length);
+    await accessFile.close();
+    dir.deleteSync(recursive: true);
+
+    expect(portalServer.secret, equals([MockSecret({})]));
+    expect(secret, isEmpty);
   });
 
   test('settings read', () async {
