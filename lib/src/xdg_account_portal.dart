@@ -45,13 +45,15 @@ class XdgAccountPortal {
 
   /// Gets information about the user.
   Stream<XdgAccountUserInformation> getUserInformation(
-      {String parentWindow = '', String reason = ''}) {
+      {String parentWindow = '', String? reason}) {
     var request = XdgPortalRequest(
       _object,
       () async {
         var options = <String, DBusValue>{};
         options['handle_token'] = DBusString(_generateToken());
-        options['reason'] = DBusString(reason);
+        if (reason != null) {
+          options['reason'] = DBusString(reason);
+        }
         var result = await _object.callMethod(
             'org.freedesktop.portal.Account',
             'GetUserInformation',
