@@ -1864,7 +1864,7 @@ void main() {
 
     var n = 0;
     var done = Completer();
-    client.networkMonitor.status.listen((status) async {
+    var s = client.networkMonitor.status.listen((status) async {
       if (n == 0) {
         expect(
             status,
@@ -1889,6 +1889,7 @@ void main() {
     });
 
     await done.future;
+    await s.cancel();
   });
 
   test('network monitor - can reach', () async {
