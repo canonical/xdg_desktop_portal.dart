@@ -1872,6 +1872,19 @@ void main() {
                 available: true,
                 metered: true,
                 connectivity: XdgNetworkConnectivity.local)));
+
+        expect(
+            status.toString(),
+            equals(
+                'XdgNetworkStatus(available: true, metered: true, connectivity: XdgNetworkConnectivity.local)'));
+        expect(
+            status.hashCode,
+            equals(XdgNetworkStatus(
+                    available: true,
+                    metered: true,
+                    connectivity: XdgNetworkConnectivity.local)
+                .hashCode));
+
         await portalServer.setNetworkStatus(
             available: false, metered: false, connectivity: 3);
       } else if (n == 1) {
