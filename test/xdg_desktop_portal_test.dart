@@ -82,6 +82,35 @@ class MockCamera {
   String toString() => '$runtimeType($options)';
 }
 
+class MockDevice {
+  final Map<String, DBusValue> options;
+  final int pid;
+  final List<XdgDeviceType> devices;
+
+  MockDevice(this.pid, this.devices, this.options);
+
+  @override
+  int get hashCode => Object.hash(
+      pid,
+      Object.hashAll(devices.map((entry) => entry.hashCode)),
+      Object.hashAll(
+          options.entries.map((entry) => Object.hash(entry.key, entry.value))));
+
+  @override
+  bool operator ==(other) {
+    if (identical(this, other)) return true;
+    final mapEquals = const DeepCollectionEquality().equals;
+
+    return other is MockDevice &&
+        other.pid == pid &&
+        mapEquals(other.devices, devices) &&
+        mapEquals(other.options, options);
+  }
+
+  @override
+  String toString() => '$runtimeType($options)';
+}
+
 class MockEmail {
   final String parentWindow;
   final Map<String, DBusValue> options;
@@ -263,6 +292,8 @@ class MockPortalObject extends DBusObject {
         return handleBackgroundMethodCall(methodCall);
       case 'org.freedesktop.portal.Camera':
         return handleCameraMethodCall(methodCall);
+      case 'org.freedesktop.portal.Device':
+        return handleDeviceMethodCall(methodCall);
       case 'org.freedesktop.portal.Email':
         return handleEmailMethodCall(methodCall);
       case 'org.freedesktop.portal.FileChooser':
@@ -356,6 +387,28 @@ class MockPortalObject extends DBusObject {
       case 'OpenPipeWireRemote':
         var handle = DBusUnixFd(ResourceHandle.fromStdin(stdin));
         return DBusMethodSuccessResponse([handle]);
+      default:
+        return DBusMethodErrorResponse.unknownMethod();
+    }
+  }
+
+  Future<DBusMethodResponse> handleDeviceMethodCall(
+      DBusMethodCall methodCall) async {
+    switch (methodCall.name) {
+      case 'AccessDevice':
+        var pid = methodCall.values[0].asUint32();
+        var devices = methodCall.values[1]
+            .asStringArray()
+            .map((name) => XdgDeviceType.values.byName(name))
+            .toList();
+        var options = methodCall.values[2].asStringVariantDict();
+        server.device.add(MockDevice(pid, devices, options));
+        var token =
+            options['handle_token']?.asString() ?? server.generateToken();
+        options.removeWhere((key, value) => key == 'handle_token');
+        var request = await server.addRequest(methodCall.sender, token);
+        Future.delayed(Duration.zero, () async => await request.respond());
+        return DBusMethodSuccessResponse([request.path]);
       default:
         return DBusMethodErrorResponse.unknownMethod();
     }
@@ -602,6 +655,8 @@ class MockPortalObject extends DBusObject {
         return getBackgroundProperty(name);
       case 'org.freedesktop.portal.Camera':
         return getCameraProperty(name);
+      case 'org.freedesktop.portal.Device':
+        return getDeviceProperty(name);
       case 'org.freedesktop.portal.Email':
         return getEmailProperty(name);
       case 'org.freedesktop.portal.FileChooser':
@@ -642,6 +697,15 @@ class MockPortalObject extends DBusObject {
   }
 
   Future<DBusMethodResponse> getCameraProperty(String name) async {
+    switch (name) {
+      case 'version':
+        return DBusGetPropertyResponse(DBusUint32(1));
+      default:
+        return DBusMethodErrorResponse.unknownProperty();
+    }
+  }
+
+  Future<DBusMethodResponse> getDeviceProperty(String name) async {
     switch (name) {
       case 'version':
         return DBusGetPropertyResponse(DBusUint32(1));
@@ -755,6 +819,7 @@ class MockPortalServer extends DBusClient {
   final accountDialogs = <MockAccountDialog>[];
   final background = <MockBackground>[];
   final camera = <MockCamera>[];
+  final device = <MockDevice>[];
   final composedEmails = <MockEmail>[];
   final openedUris = <MockUri>[];
   final openFileDialogs = <MockDialog>[];
@@ -1015,6 +1080,30 @@ void main() {
 
     var result = await client.camera.openPipeWireRemote();
     expect(result, isNotNull);
+  });
+
+  test('device access', () async {
+    var server = DBusServer();
+    var clientAddress =
+        await server.listenAddress(DBusAddress.unix(dir: Directory.systemTemp));
+    addTearDown(() async {
+      await server.close();
+    });
+
+    var portalServer = MockPortalServer(clientAddress);
+    await portalServer.start();
+    addTearDown(() async {
+      await portalServer.close();
+    });
+
+    var client = XdgDesktopPortalClient(bus: DBusClient(clientAddress));
+    addTearDown(() async {
+      await client.close();
+    });
+    expect(await client.device.getVersion(), equals(1));
+    final devices = [XdgDeviceType.camera];
+    await client.device.accessDevice(pid: pid, devices: devices);
+    expect(portalServer.device, equals([MockDevice(pid, devices, {})]));
   });
 
   test('email', () async {

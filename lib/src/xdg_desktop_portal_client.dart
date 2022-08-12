@@ -6,6 +6,7 @@ import 'package:dbus/dbus.dart';
 import 'xdg_account_portal.dart';
 import 'xdg_background_portal.dart';
 import 'xdg_camera_portal.dart';
+import 'xdg_device_portal.dart';
 import 'xdg_email_portal.dart';
 import 'xdg_file_chooser_portal.dart';
 import 'xdg_network_monitor_portal.dart';
@@ -31,6 +32,9 @@ class XdgDesktopPortalClient {
 
   /// Camera portal.
   late final XdgCameraPortal camera;
+
+  /// Portal for device access.
+  late final XdgDevicePortal device;
 
   /// Portal to send email.
   late final XdgEmailPortal email;
@@ -69,6 +73,7 @@ class XdgDesktopPortalClient {
     account = XdgAccountPortal(_object, _generateToken);
     background = XdgBackgroundPortal(_object, _generateToken);
     camera = XdgCameraPortal(_object, _generateToken);
+    device = XdgDevicePortal(_object, _generateToken);
     email = XdgEmailPortal(_object, _generateToken);
     fileChooser = XdgFileChooserPortal(_object, _generateToken);
     location = XdgLocationPortal(_object, _generateToken);
