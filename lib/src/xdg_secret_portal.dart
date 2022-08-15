@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:dbus/dbus.dart';
 
@@ -18,7 +19,11 @@ class XdgSecretPortal {
       .then((v) => v.asUint32());
 
   /// Retrieves a master secret for a sandboxed application.
-  Future<void> retrieveSecret(RandomAccessFile file, {String? token}) async {
+  Future<Uint8List> retrieveSecret({String? token}) async {
+    var dir = Directory.systemTemp.createTempSync();
+    var file = await File('${dir.path}/secret').create();
+    var accessFile = await file.open(mode: FileMode.write);
+
     var request = XdgPortalRequest(_object, () async {
       var options = <String, DBusValue>{};
       options['handle_token'] = DBusString(_generateToken());
@@ -29,12 +34,20 @@ class XdgSecretPortal {
           'org.freedesktop.portal.Secret',
           'RetrieveSecret',
           [
-            DBusUnixFd(ResourceHandle.fromFile(file)),
+            DBusUnixFd(ResourceHandle.fromFile(accessFile)),
             DBusDict.stringVariant(options),
           ],
           replySignature: DBusSignature('o'));
       return result.returnValues[0].asObjectPath();
     });
     await request.stream.first;
+
+    await accessFile.setPosition(0);
+    final length = await accessFile.length();
+    final secret = await accessFile.read(length);
+    await accessFile.close();
+
+    dir.deleteSync(recursive: true);
+    return secret;
   }
 }

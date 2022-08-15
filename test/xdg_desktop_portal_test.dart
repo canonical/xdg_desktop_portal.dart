@@ -2317,16 +2317,7 @@ void main() {
 
     expect(await client.secret.getVersion(), equals(1));
 
-    var dir = Directory.systemTemp.createTempSync();
-    var file = await File('${dir.path}/MASTER_SECRETE').create();
-    var accessFile = await file.open(mode: FileMode.write);
-    await client.secret.retrieveSecret(accessFile);
-    accessFile.setPositionSync(0);
-    final length = accessFile.lengthSync();
-    final secret = accessFile.readSync(length);
-    await accessFile.close();
-    dir.deleteSync(recursive: true);
-
+    final secret = await client.secret.retrieveSecret();
     expect(portalServer.secret, equals([MockSecret({})]));
     expect(secret, isEmpty);
   });
