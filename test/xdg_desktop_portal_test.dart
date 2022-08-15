@@ -310,6 +310,8 @@ class MockPortalDesktopObject extends DBusObject {
         return handleOpenURIMethodCall(methodCall);
       case 'org.freedesktop.portal.ProxyResolver':
         return handleProxyResolverMethodCall(methodCall);
+      case 'org.freedesktop.portal.ScreenCast':
+        return handleScreenCastMethodCall(methodCall);
       case 'org.freedesktop.portal.Secret':
         return handleSecretMethodCall(methodCall);
       case 'org.freedesktop.portal.Settings':
@@ -597,6 +599,14 @@ class MockPortalDesktopObject extends DBusObject {
     }
   }
 
+  Future<DBusMethodResponse> handleScreenCastMethodCall(
+      DBusMethodCall methodCall) async {
+    switch (methodCall.name) {
+      default:
+        return DBusMethodErrorResponse.unknownMethod();
+    }
+  }
+
   Future<DBusMethodResponse> handleSecretMethodCall(
       DBusMethodCall methodCall) async {
     switch (methodCall.name) {
@@ -669,6 +679,8 @@ class MockPortalDesktopObject extends DBusObject {
         return getOpenURIProperty(name);
       case 'org.freedesktop.portal.ProxyResolver':
         return getProxyResolverProperty(name);
+      case 'org.freedesktop.portal.ScreenCast':
+        return getScreenCastProperty(name);
       case 'org.freedesktop.portal.Secret':
         return getSecretProperty(name);
       case 'org.freedesktop.portal.Settings':
@@ -763,6 +775,15 @@ class MockPortalDesktopObject extends DBusObject {
     switch (name) {
       case 'version':
         return DBusGetPropertyResponse(DBusUint32(1));
+      default:
+        return DBusMethodErrorResponse.unknownProperty();
+    }
+  }
+
+  Future<DBusMethodResponse> getScreenCastProperty(String name) async {
+    switch (name) {
+      case 'version':
+        return DBusGetPropertyResponse(DBusUint32(4));
       default:
         return DBusMethodErrorResponse.unknownProperty();
     }
@@ -2513,6 +2534,28 @@ void main() {
 
     expect(await client.proxyResolver.lookup('http://example.com'),
         equals(['http://localhost:1234']));
+  });
+
+  test('screen cast', () async {
+    var server = DBusServer();
+    var clientAddress =
+        await server.listenAddress(DBusAddress.unix(dir: Directory.systemTemp));
+    addTearDown(() async {
+      await server.close();
+    });
+
+    var portalServer = MockPortalDesktopServer(clientAddress);
+    await portalServer.start();
+    addTearDown(() async {
+      await portalServer.close();
+    });
+
+    var client = XdgDesktopPortalClient(bus: DBusClient(clientAddress));
+    addTearDown(() async {
+      await client.close();
+    });
+
+    expect(await client.screenCast.getVersion(), equals(4));
   });
 
   test('secret', () async {
