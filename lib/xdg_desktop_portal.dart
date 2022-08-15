@@ -9,4 +9,5 @@ export 'src/xdg_location_portal.dart';
 export 'src/xdg_open_uri_portal.dart';
 export 'src/xdg_portal_request_exception.dart';
 export 'src/xdg_proxy_resolver_portal.dart';
+export 'src/xdg_screen_cast_portal.dart';
 export 'src/xdg_settings_portal.dart';
