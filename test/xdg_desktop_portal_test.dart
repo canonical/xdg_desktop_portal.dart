@@ -192,6 +192,27 @@ class MockLocationSession {
   String toString() => '$runtimeType($parentWindow, $options)';
 }
 
+class MockScreenCast {
+  final Map<String, DBusValue> options;
+
+  MockScreenCast(this.options);
+
+  @override
+  int get hashCode => Object.hashAll(
+      options.entries.map((entry) => Object.hash(entry.key, entry.value)));
+
+  @override
+  bool operator ==(other) {
+    if (identical(this, other)) return true;
+    final mapEquals = const DeepCollectionEquality().equals;
+
+    return other is MockScreenCast && mapEquals(other.options, options);
+  }
+
+  @override
+  String toString() => '$runtimeType($options)';
+}
+
 class MockPortalRequestObject extends DBusObject {
   final MockPortalServer server;
   Future<void> Function()? onClosed;
@@ -277,6 +298,8 @@ class MockPortalObject extends DBusObject {
         return handleOpenURIMethodCall(methodCall);
       case 'org.freedesktop.portal.ProxyResolver':
         return handleProxyResolverMethodCall(methodCall);
+      case 'org.freedesktop.portal.ScreenCast':
+        return handleScreenCastMethodCall(methodCall);
       case 'org.freedesktop.portal.Settings':
         return handleSettingsMethodCall(methodCall);
       default:
@@ -562,6 +585,81 @@ class MockPortalObject extends DBusObject {
     }
   }
 
+  Future<DBusMethodResponse> handleScreenCastMethodCall(
+      DBusMethodCall methodCall) async {
+    switch (methodCall.name) {
+      case 'CreateSession':
+        var options = methodCall.values[0].asStringVariantDict();
+        server.screenCast.add(MockScreenCast(options));
+        var token =
+            options['handle_token']?.asString() ?? server.generateToken();
+        options.removeWhere((key, value) => key == 'handle_token');
+        options.removeWhere((key, value) => key == 'session_handle_token');
+        var request = await server.addRequest(methodCall.sender, token);
+        Future.delayed(
+            Duration.zero,
+            () async => await request.respond(result: <String, DBusValue>{
+                  'session_handle': DBusString(server.screenCastSessionHandle!)
+                }));
+        return DBusMethodSuccessResponse([request.path]);
+      case 'SelectSources':
+        var options = methodCall.values[1].asStringVariantDict();
+        server.screenCast.add(MockScreenCast(options));
+        var token =
+            options['handle_token']?.asString() ?? server.generateToken();
+        options.removeWhere((key, value) => key == 'handle_token');
+        var request = await server.addRequest(methodCall.sender, token);
+        Future.delayed(Duration.zero, () async => await request.respond());
+        return DBusMethodSuccessResponse([request.path]);
+      case 'Start':
+        var options = methodCall.values[2].asStringVariantDict();
+        server.screenCast.add(MockScreenCast(options));
+        var token =
+            options['handle_token']?.asString() ?? server.generateToken();
+        options.removeWhere((key, value) => key == 'handle_token');
+        var request = await server.addRequest(methodCall.sender, token);
+        var result = <String, DBusValue>{};
+        var streams = server.screenCastStreamsList!.map((stream) {
+          int sourceType = 0;
+          switch (stream.sourceType) {
+            case ScreenCastAvailableSourceType.monitor:
+              sourceType = 1;
+              break;
+            case ScreenCastAvailableSourceType.window:
+              sourceType = 2;
+              break;
+            case ScreenCastAvailableSourceType.virtual:
+              sourceType = 4;
+              break;
+            default:
+          }
+          return DBusStruct([
+            DBusUint32(stream.nodeId),
+            DBusDict.stringVariant({
+              'id': DBusString(stream.id),
+              'source_type': DBusUint32(sourceType),
+              'position': DBusStruct([
+                DBusInt32(stream.position[0]),
+                DBusInt32(stream.position[1])
+              ]),
+              'size': DBusStruct(
+                  [DBusInt32(stream.size[0]), DBusInt32(stream.size[1])])
+            })
+          ]);
+        }).toList();
+        result['streams'] = DBusArray(DBusSignature('(ua{sv})'), streams);
+
+        Future.delayed(
+            Duration.zero, () async => await request.respond(result: result));
+        return DBusMethodSuccessResponse([request.path]);
+      case 'OpenPipeWireRemote':
+        var handle = DBusUnixFd(ResourceHandle.fromStdin(stdin));
+        return DBusMethodSuccessResponse([handle]);
+      default:
+        return DBusMethodErrorResponse.unknownMethod();
+    }
+  }
+
   Future<DBusMethodResponse> handleSettingsMethodCall(
       DBusMethodCall methodCall) async {
     switch (methodCall.name) {
@@ -616,6 +714,8 @@ class MockPortalObject extends DBusObject {
         return getOpenURIProperty(name);
       case 'org.freedesktop.portal.ProxyResolver':
         return getProxyResolverProperty(name);
+      case 'org.freedesktop.portal.ScreenCast':
+        return getScreenCastProperty(name);
       case 'org.freedesktop.portal.Settings':
         return getSettingsProperty(name);
       default:
@@ -713,6 +813,19 @@ class MockPortalObject extends DBusObject {
     }
   }
 
+  Future<DBusMethodResponse> getScreenCastProperty(String name) async {
+    switch (name) {
+      case 'version':
+        return DBusGetPropertyResponse(DBusUint32(1));
+      case 'AvailableSourceTypes':
+        return DBusGetPropertyResponse(DBusUint32(1));
+      case 'AvailableCursorModes':
+        return DBusGetPropertyResponse(DBusUint32(7));
+      default:
+        return DBusMethodErrorResponse.unknownProperty();
+    }
+  }
+
   Future<DBusMethodResponse> getSettingsProperty(String name) async {
     switch (name) {
       case 'version':
@@ -751,6 +864,8 @@ class MockPortalServer extends DBusClient {
   bool networkAvailable;
   bool networkMetered;
   int networkConnectivity;
+  final String? screenCastSessionHandle;
+  final List<ScreenCastStream>? screenCastStreamsList;
 
   final accountDialogs = <MockAccountDialog>[];
   final background = <MockBackground>[];
@@ -763,6 +878,7 @@ class MockPortalServer extends DBusClient {
   Iterable<MockLocationSession> get locationSessions =>
       _locationSessions.values;
   final _locationSessions = <DBusObjectPath, MockLocationSession>{};
+  final screenCast = <MockScreenCast>[];
 
   MockPortalServer(DBusAddress clientAddress,
       {this.userId,
@@ -778,7 +894,9 @@ class MockPortalServer extends DBusClient {
       this.closeLocationSession = false,
       this.networkAvailable = true,
       this.networkMetered = false,
-      this.networkConnectivity = 3})
+      this.networkConnectivity = 3,
+      this.screenCastSessionHandle,
+      this.screenCastStreamsList})
       : super(clientAddress) {
     _root = MockPortalObject(this);
     this.notifications = notifications ?? {};
@@ -2242,6 +2360,72 @@ void main() {
 
     expect(await client.proxyResolver.lookup('http://example.com'),
         equals(['http://localhost:1234']));
+  });
+
+  test('screen cast', () async {
+    var server = DBusServer();
+    var clientAddress =
+        await server.listenAddress(DBusAddress.unix(dir: Directory.systemTemp));
+    addTearDown(() async {
+      await server.close();
+    });
+    final screenCastStreamsList = [
+      ScreenCastStream(
+        nodeId: 1,
+        id: '123',
+        sourceType: ScreenCastAvailableSourceType.monitor,
+        position: [1920, 0],
+        size: [1920, 1080],
+      ),
+      ScreenCastStream(
+        nodeId: 2,
+        id: '456',
+        sourceType: ScreenCastAvailableSourceType.monitor,
+        position: [1920, 0],
+        size: [1920, 1080],
+      ),
+    ];
+
+    var portalServer = MockPortalServer(
+      clientAddress,
+      screenCastSessionHandle:
+          '/org/freedesktop/portal/desktop/session/123/dart123',
+      screenCastStreamsList: screenCastStreamsList,
+    );
+
+    await portalServer.start();
+    addTearDown(() async {
+      await portalServer.close();
+    });
+
+    var client = XdgDesktopPortalClient(bus: DBusClient(clientAddress));
+    addTearDown(() async {
+      await client.close();
+    });
+    expect(await client.screenCast.getVersion(), equals(1));
+    expect(
+        await client.screenCast.getAvailableCursorModes(),
+        equals(<ScreenCastAvailableCursorMode>{
+          ScreenCastAvailableCursorMode.hidden,
+          ScreenCastAvailableCursorMode.embedded,
+          ScreenCastAvailableCursorMode.metadata
+        }));
+    expect(
+        await client.screenCast.getAvailableSourceTypes(),
+        equals(<ScreenCastAvailableSourceType>{
+          ScreenCastAvailableSourceType.monitor
+        }));
+
+    await client.screenCast.createSession();
+    expect(portalServer.screenCast, [MockScreenCast({})]);
+    await client.screenCast.selectSources(multiple: true);
+    expect(portalServer.screenCast.last,
+        MockScreenCast({'multiple': DBusBoolean(true)}));
+
+    final result = await client.screenCast.start();
+    expect(result, equals(screenCastStreamsList));
+    var fd = await client.screenCast.openPipeWireRemote();
+    expect(fd, isNotNull);
   });
 
   test('settings read', () async {

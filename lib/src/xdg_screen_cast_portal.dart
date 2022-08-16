@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:collection/collection.dart';
 import 'package:dbus/dbus.dart';
 
 import 'xdg_portal_request.dart';
@@ -18,18 +19,28 @@ enum ScreenCastSessionPersistMode {
   /// Do not persist.
   no,
 
-  ///Permissions persist as long as the application is running.
+  /// Permissions persist as long as the application is running.
   running,
 
   /// Permissions persist until explicitly revoked.
   untilRevoked
 }
 
+/// An array of PipeWire streams.
 class ScreenCastStream {
+  /// The PipeWire node ID.
   final int nodeId;
+
+  /// Opaque identifier.
   final String id;
+
+  /// A tuple consisting of the position (x, y) in the compositor coordinate space.
   final List<int> position;
+
+  /// A tuple consisting of (width, height).
   final List<int> size;
+
+  /// The type of the content which is being screen casted.
   final ScreenCastAvailableSourceType sourceType;
 
   ScreenCastStream({
@@ -44,13 +55,16 @@ class ScreenCastStream {
       nodeId, id, Object.hashAll(position), Object.hashAll(size), sourceType);
 
   @override
-  bool operator ==(other) =>
-      other is ScreenCastStream &&
-      other.nodeId == nodeId &&
-      other.id == id &&
-      other.position == position &&
-      other.size == size &&
-      other.sourceType == sourceType;
+  bool operator ==(other) {
+    if (identical(this, other)) return true;
+    final listEquals = const DeepCollectionEquality().equals;
+    return other is ScreenCastStream &&
+        other.nodeId == nodeId &&
+        other.id == id &&
+        listEquals(other.position, position) &&
+        listEquals(other.size, size) &&
+        other.sourceType == sourceType;
+  }
 
   @override
   String toString() =>
@@ -175,6 +189,7 @@ class XdgScreenCastPortal {
     await request.stream.first;
   }
 
+  /// Start the screen cast session.
   Future<List<ScreenCastStream>> start({String parentWindow = ''}) async {
     var request = XdgPortalRequest(_object, () async {
       var options = <String, DBusValue>{};
