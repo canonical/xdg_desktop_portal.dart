@@ -108,27 +108,6 @@ class MockEmail {
   String toString() => '$runtimeType($parentWindow, $options)';
 }
 
-class MockSecret {
-  final Map<String, DBusValue> options;
-
-  MockSecret(this.options);
-
-  @override
-  int get hashCode => Object.hashAll(
-      options.entries.map((entry) => Object.hash(entry.key, entry.value)));
-
-  @override
-  bool operator ==(other) {
-    if (identical(this, other)) return true;
-    final mapEquals = const DeepCollectionEquality().equals;
-
-    return other is MockSecret && mapEquals(other.options, options);
-  }
-
-  @override
-  String toString() => '$runtimeType($options)';
-}
-
 class MockUri {
   final String parentWindow;
   final String uri;
@@ -589,8 +568,9 @@ class MockPortalObject extends DBusObject {
       DBusMethodCall methodCall) async {
     switch (methodCall.name) {
       case 'RetrieveSecret':
+        var handle = methodCall.values[0].asUnixFd();
+        await handle.toFile().writeFrom(server.secret);
         var options = methodCall.values[1].asStringVariantDict();
-        server.secret.add(MockSecret(options));
         var token =
             options['handle_token']?.asString() ?? server.generateToken();
         options.removeWhere((key, value) => key == 'handle_token');
@@ -802,6 +782,7 @@ class MockPortalServer extends DBusClient {
   bool networkAvailable;
   bool networkMetered;
   int networkConnectivity;
+  List<int> secret;
 
   final accountDialogs = <MockAccountDialog>[];
   final background = <MockBackground>[];
@@ -811,27 +792,28 @@ class MockPortalServer extends DBusClient {
   final openFileDialogs = <MockDialog>[];
   final saveFileDialogs = <MockDialog>[];
   final saveFilesDialogs = <MockDialog>[];
-  final secret = <MockSecret>[];
   Iterable<MockLocationSession> get locationSessions =>
       _locationSessions.values;
   final _locationSessions = <DBusObjectPath, MockLocationSession>{};
 
-  MockPortalServer(DBusAddress clientAddress,
-      {this.userId,
-      this.userName,
-      this.userImage,
-      this.openFileResponse,
-      this.saveFileResponse,
-      this.saveFilesResponse,
-      Map<String, Map<String, DBusValue>>? notifications,
-      this.proxies = const {},
-      this.settingsValues = const {},
-      this.locations = const [],
-      this.closeLocationSession = false,
-      this.networkAvailable = true,
-      this.networkMetered = false,
-      this.networkConnectivity = 3})
-      : super(clientAddress) {
+  MockPortalServer(
+    DBusAddress clientAddress, {
+    this.userId,
+    this.userName,
+    this.userImage,
+    this.openFileResponse,
+    this.saveFileResponse,
+    this.saveFilesResponse,
+    Map<String, Map<String, DBusValue>>? notifications,
+    this.proxies = const {},
+    this.settingsValues = const {},
+    this.locations = const [],
+    this.closeLocationSession = false,
+    this.networkAvailable = true,
+    this.networkMetered = false,
+    this.networkConnectivity = 3,
+    this.secret = const [],
+  }) : super(clientAddress) {
     _root = MockPortalObject(this);
     this.notifications = notifications ?? {};
   }
@@ -2304,7 +2286,8 @@ void main() {
       await server.close();
     });
 
-    var portalServer = MockPortalServer(clientAddress);
+    Uint8List secret = Uint8List.fromList(<int>[0, 100, 200, 255]);
+    var portalServer = MockPortalServer(clientAddress, secret: secret);
     await portalServer.start();
     addTearDown(() async {
       await portalServer.close();
@@ -2316,10 +2299,7 @@ void main() {
     });
 
     expect(await client.secret.getVersion(), equals(1));
-
-    final secret = await client.secret.retrieveSecret();
-    expect(portalServer.secret, equals([MockSecret({})]));
-    expect(secret, isEmpty);
+    expect(await client.secret.retrieveSecret(), equals(secret));
   });
 
   test('settings read', () async {
