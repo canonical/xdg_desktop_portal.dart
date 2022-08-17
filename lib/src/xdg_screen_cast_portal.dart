@@ -26,7 +26,7 @@ enum ScreenCastSessionPersistMode {
   untilRevoked
 }
 
-/// An array of PipeWire streams.
+/// PipeWire stream properties.
 class ScreenCastStream {
   /// The PipeWire node ID.
   final int nodeId;
@@ -34,11 +34,10 @@ class ScreenCastStream {
   /// Opaque identifier.
   final String id;
 
-  /// A tuple consisting of the position (x, y) in the compositor coordinate space.
-  final List<int> position;
-
-  /// A tuple consisting of (width, height).
-  final List<int> size;
+  final int x;
+  final int y;
+  final int width;
+  final int height;
 
   /// The type of the content which is being screen casted.
   final ScreenCastAvailableSourceType sourceType;
@@ -46,29 +45,32 @@ class ScreenCastStream {
   ScreenCastStream({
     required this.nodeId,
     required this.id,
-    required this.position,
-    required this.size,
+    required this.x,
+    required this.y,
+    required this.width,
+    required this.height,
     required this.sourceType,
   });
   @override
-  int get hashCode => Object.hash(
-      nodeId, id, Object.hashAll(position), Object.hashAll(size), sourceType);
+  int get hashCode => Object.hash(nodeId, id, x, y, width, height, sourceType);
 
   @override
   bool operator ==(other) {
     if (identical(this, other)) return true;
-    final listEquals = const DeepCollectionEquality().equals;
+
     return other is ScreenCastStream &&
         other.nodeId == nodeId &&
         other.id == id &&
-        listEquals(other.position, position) &&
-        listEquals(other.size, size) &&
+        other.x == x &&
+        other.y == y &&
+        other.width == width &&
+        other.height == height &&
         other.sourceType == sourceType;
   }
 
   @override
   String toString() =>
-      '$runtimeType(node ID: $nodeId, id: $id, position: $position, size: $size, sourceType: $sourceType})';
+      '$runtimeType(node ID: $nodeId, id: $id, position: ($x, $y), size: ($width, $height), sourceType: $sourceType})';
 }
 
 /// Screen cast portal.
@@ -116,10 +118,16 @@ class XdgScreenCastPortal {
         return types;
       });
 
-  /// Create a location session that returns a stream of location updates from the portal.
-  /// When the session is no longer required close the stream.
-  Future<void> createSession() async {
-    var request = XdgPortalRequest(_object, () async {
+  /// Create a screen cast session.
+  Future<List<ScreenCastStream>> createSession({
+    String parentWindow = '',
+    Set<ScreenCastAvailableSourceType>? sourceTypes,
+    bool? multiple,
+    Set<ScreenCastAvailableCursorMode>? cursorModes,
+    String? restoreToken,
+    ScreenCastSessionPersistMode? persistMode,
+  }) async {
+    var requestCreateSession = XdgPortalRequest(_object, () async {
       var options = <String, DBusValue>{};
       options['handle_token'] = DBusString(_generateToken());
       options['session_handle_token'] = DBusString(_generateToken());
@@ -131,21 +139,11 @@ class XdgScreenCastPortal {
       return createResult.returnValues[0].asObjectPath();
     });
 
-    final result = await request.stream.first;
-    final sessionHandle = result['session_handle']?.asString() ?? '';
-    _sessionPath = DBusObjectPath(sessionHandle);
-  }
+    final resultCreateSession = await requestCreateSession.stream.first;
+    _sessionPath =
+        DBusObjectPath(resultCreateSession['session_handle']?.asString() ?? '');
 
-  /// Configure what the screen cast session should record.
-  /// This method must be called before starting the session.
-  Future<void> selectSources({
-    Set<ScreenCastAvailableSourceType>? sourceTypes,
-    bool? multiple,
-    Set<ScreenCastAvailableCursorMode>? cursorModes,
-    String? restoreToken,
-    ScreenCastSessionPersistMode? persistMode,
-  }) async {
-    var request = XdgPortalRequest(_object, () async {
+    var requestSelectSources = XdgPortalRequest(_object, () async {
       var options = <String, DBusValue>{};
       options['handle_token'] = DBusString(_generateToken());
       if (sourceTypes != null) {
@@ -186,12 +184,9 @@ class XdgScreenCastPortal {
       );
       return result.returnValues[0].asObjectPath();
     });
-    await request.stream.first;
-  }
+    await requestSelectSources.stream.first;
 
-  /// Start the screen cast session.
-  Future<List<ScreenCastStream>> start({String parentWindow = ''}) async {
-    var request = XdgPortalRequest(_object, () async {
+    var requestStart = XdgPortalRequest(_object, () async {
       var options = <String, DBusValue>{};
       options['handle_token'] = DBusString(_generateToken());
       var result = await _object.callMethod(
@@ -206,8 +201,8 @@ class XdgScreenCastPortal {
       );
       return result.returnValues[0].asObjectPath();
     });
-    final resultResult = await request.stream.first;
-    final streams = resultResult['streams']!.asArray();
+    final resultStart = await requestStart.stream.first;
+    final streams = resultStart['streams']!.asArray();
     return streams.map((stream) {
       final params = stream.asStruct();
       final nodeId = params[0].asUint32();
@@ -224,15 +219,15 @@ class XdgScreenCastPortal {
         sourceType = ScreenCastAvailableSourceType.virtual;
       }
       final positionArray = properties['position']!.asStruct();
-      final position = [positionArray[0].asInt32(), positionArray[1].asInt32()];
       final sizeArray = properties['size']!.asStruct();
-      final size = [sizeArray[0].asInt32(), sizeArray[1].asInt32()];
       return ScreenCastStream(
         nodeId: nodeId,
         id: id,
         sourceType: sourceType,
-        position: position,
-        size: size,
+        x: positionArray[0].asInt32(),
+        y: positionArray[1].asInt32(),
+        width: sizeArray[0].asInt32(),
+        height: sizeArray[1].asInt32(),
       );
     }).toList();
   }

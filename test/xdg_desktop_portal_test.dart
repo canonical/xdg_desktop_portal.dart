@@ -638,12 +638,10 @@ class MockPortalObject extends DBusObject {
             DBusDict.stringVariant({
               'id': DBusString(stream.id),
               'source_type': DBusUint32(sourceType),
-              'position': DBusStruct([
-                DBusInt32(stream.position[0]),
-                DBusInt32(stream.position[1])
-              ]),
+              'position':
+                  DBusStruct([DBusInt32(stream.x), DBusInt32(stream.y)]),
               'size': DBusStruct(
-                  [DBusInt32(stream.size[0]), DBusInt32(stream.size[1])])
+                  [DBusInt32(stream.width), DBusInt32(stream.height)])
             })
           ]);
         }).toList();
@@ -2374,15 +2372,19 @@ void main() {
         nodeId: 1,
         id: '123',
         sourceType: ScreenCastAvailableSourceType.monitor,
-        position: [1920, 0],
-        size: [1920, 1080],
+        x: 1920,
+        y: 0,
+        width: 1920,
+        height: 1080,
       ),
       ScreenCastStream(
         nodeId: 2,
         id: '456',
         sourceType: ScreenCastAvailableSourceType.monitor,
-        position: [1920, 0],
-        size: [1920, 1080],
+        x: 1920,
+        y: 0,
+        width: 1920,
+        height: 1080,
       ),
     ];
 
@@ -2416,13 +2418,12 @@ void main() {
           ScreenCastAvailableSourceType.monitor
         }));
 
-    await client.screenCast.createSession();
-    expect(portalServer.screenCast, [MockScreenCast({})]);
-    await client.screenCast.selectSources(multiple: true);
-    expect(portalServer.screenCast.last,
-        MockScreenCast({'multiple': DBusBoolean(true)}));
-
-    final result = await client.screenCast.start();
+    final result = await client.screenCast.createSession(multiple: true);
+    expect(portalServer.screenCast, [
+      MockScreenCast({}),
+      MockScreenCast({'multiple': DBusBoolean(true)}),
+      MockScreenCast({})
+    ]);
     expect(result, equals(screenCastStreamsList));
     var fd = await client.screenCast.openPipeWireRemote();
     expect(fd, isNotNull);
