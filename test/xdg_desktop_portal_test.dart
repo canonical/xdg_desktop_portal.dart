@@ -300,6 +300,8 @@ class MockPortalObject extends DBusObject {
         return handleProxyResolverMethodCall(methodCall);
       case 'org.freedesktop.portal.ScreenCast':
         return handleScreenCastMethodCall(methodCall);
+      case 'org.freedesktop.portal.Secret':
+        return handleSecretMethodCall(methodCall);
       case 'org.freedesktop.portal.Settings':
         return handleSettingsMethodCall(methodCall);
       default:
@@ -658,6 +660,24 @@ class MockPortalObject extends DBusObject {
     }
   }
 
+  Future<DBusMethodResponse> handleSecretMethodCall(
+      DBusMethodCall methodCall) async {
+    switch (methodCall.name) {
+      case 'RetrieveSecret':
+        var handle = methodCall.values[0].asUnixFd();
+        await handle.toFile().writeFrom(server.secret);
+        var options = methodCall.values[1].asStringVariantDict();
+        var token =
+            options['handle_token']?.asString() ?? server.generateToken();
+        options.removeWhere((key, value) => key == 'handle_token');
+        var request = await server.addRequest(methodCall.sender, token);
+        Future.delayed(Duration.zero, () async => await request.respond());
+        return DBusMethodSuccessResponse([request.path]);
+      default:
+        return DBusMethodErrorResponse.unknownMethod();
+    }
+  }
+
   Future<DBusMethodResponse> handleSettingsMethodCall(
       DBusMethodCall methodCall) async {
     switch (methodCall.name) {
@@ -714,6 +734,8 @@ class MockPortalObject extends DBusObject {
         return getProxyResolverProperty(name);
       case 'org.freedesktop.portal.ScreenCast':
         return getScreenCastProperty(name);
+      case 'org.freedesktop.portal.Secret':
+        return getSecretProperty(name);
       case 'org.freedesktop.portal.Settings':
         return getSettingsProperty(name);
       default:
@@ -824,6 +846,15 @@ class MockPortalObject extends DBusObject {
     }
   }
 
+  Future<DBusMethodResponse> getSecretProperty(String name) async {
+    switch (name) {
+      case 'version':
+        return DBusGetPropertyResponse(DBusUint32(1));
+      default:
+        return DBusMethodErrorResponse.unknownProperty();
+    }
+  }
+
   Future<DBusMethodResponse> getSettingsProperty(String name) async {
     switch (name) {
       case 'version':
@@ -864,6 +895,7 @@ class MockPortalServer extends DBusClient {
   int networkConnectivity;
   final String? screenCastSessionHandle;
   final List<ScreenCastStream>? screenCastStreamsList;
+  List<int> secret;
 
   final accountDialogs = <MockAccountDialog>[];
   final background = <MockBackground>[];
@@ -878,24 +910,26 @@ class MockPortalServer extends DBusClient {
   final _locationSessions = <DBusObjectPath, MockLocationSession>{};
   final screenCast = <MockScreenCast>[];
 
-  MockPortalServer(DBusAddress clientAddress,
-      {this.userId,
-      this.userName,
-      this.userImage,
-      this.openFileResponse,
-      this.saveFileResponse,
-      this.saveFilesResponse,
-      Map<String, Map<String, DBusValue>>? notifications,
-      this.proxies = const {},
-      this.settingsValues = const {},
-      this.locations = const [],
-      this.closeLocationSession = false,
-      this.networkAvailable = true,
-      this.networkMetered = false,
-      this.networkConnectivity = 3,
-      this.screenCastSessionHandle,
-      this.screenCastStreamsList})
-      : super(clientAddress) {
+  MockPortalServer(
+    DBusAddress clientAddress, {
+    this.userId,
+    this.userName,
+    this.userImage,
+    this.openFileResponse,
+    this.saveFileResponse,
+    this.saveFilesResponse,
+    Map<String, Map<String, DBusValue>>? notifications,
+    this.proxies = const {},
+    this.settingsValues = const {},
+    this.locations = const [],
+    this.closeLocationSession = false,
+    this.networkAvailable = true,
+    this.networkMetered = false,
+    this.networkConnectivity = 3,
+    this.screenCastSessionHandle,
+    this.screenCastStreamsList,
+    this.secret = const [],
+  }) : super(clientAddress) {
     _root = MockPortalObject(this);
     this.notifications = notifications ?? {};
   }
@@ -1445,51 +1479,9 @@ void main() {
               ])
             ]),
             'current_name': DBusString('flutter.png'),
-            'current_folder': DBusArray.byte([
-              47,
-              117,
-              115,
-              114,
-              47,
-              115,
-              104,
-              97,
-              114,
-              101,
-              47,
-              105,
-              99,
-              111,
-              110,
-              115
-            ]),
-            'current_file': DBusArray.byte([
-              47,
-              117,
-              115,
-              114,
-              47,
-              115,
-              104,
-              97,
-              114,
-              101,
-              47,
-              105,
-              99,
-              111,
-              110,
-              115,
-              47,
-              100,
-              97,
-              114,
-              116,
-              46,
-              112,
-              110,
-              103
-            ])
+            'current_folder': DBusArray.byte(utf8.encode('/usr/share/icons')),
+            'current_file':
+                DBusArray.byte(utf8.encode('/usr/share/icons/dart.png')),
           })
         ]));
     expect(result.uris, equals(['file://home/me/image.png']));
@@ -1593,82 +1585,10 @@ void main() {
                 DBusString('green')
               ])
             ]),
-            'current_folder': DBusArray.byte([
-              47,
-              117,
-              115,
-              114,
-              47,
-              115,
-              104,
-              97,
-              114,
-              101,
-              47,
-              105,
-              99,
-              111,
-              110,
-              115
-            ]),
+            'current_folder': DBusArray.byte(utf8.encode('/usr/share/icons')),
             'files': DBusArray(DBusSignature('ay'), [
-              DBusArray.byte([
-                47,
-                117,
-                115,
-                114,
-                47,
-                115,
-                104,
-                97,
-                114,
-                101,
-                47,
-                105,
-                99,
-                111,
-                110,
-                115,
-                47,
-                100,
-                97,
-                114,
-                116,
-                46,
-                112,
-                110,
-                103
-              ]),
-              DBusArray.byte([
-                47,
-                117,
-                115,
-                114,
-                47,
-                115,
-                104,
-                97,
-                114,
-                101,
-                47,
-                105,
-                99,
-                111,
-                110,
-                115,
-                47,
-                102,
-                108,
-                117,
-                116,
-                116,
-                101,
-                114,
-                46,
-                112,
-                110,
-                103
-              ])
+              DBusArray.byte(utf8.encode('/usr/share/icons/dart.png')),
+              DBusArray.byte(utf8.encode('/usr/share/icons/flutter.png'))
             ])
           })
         ]));
@@ -2427,6 +2347,30 @@ void main() {
     expect(result, equals(screenCastStreamsList));
     var fd = await client.screenCast.openPipeWireRemote();
     expect(fd, isNotNull);
+  });
+
+  test('secret', () async {
+    var server = DBusServer();
+    var clientAddress =
+        await server.listenAddress(DBusAddress.unix(dir: Directory.systemTemp));
+    addTearDown(() async {
+      await server.close();
+    });
+
+    Uint8List secret = Uint8List.fromList(<int>[0, 100, 200, 255]);
+    var portalServer = MockPortalServer(clientAddress, secret: secret);
+    await portalServer.start();
+    addTearDown(() async {
+      await portalServer.close();
+    });
+
+    var client = XdgDesktopPortalClient(bus: DBusClient(clientAddress));
+    addTearDown(() async {
+      await client.close();
+    });
+
+    expect(await client.secret.getVersion(), equals(1));
+    expect(await client.secret.retrieveSecret(), equals(secret));
   });
 
   test('settings read', () async {
