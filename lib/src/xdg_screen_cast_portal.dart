@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:collection/collection.dart';
 import 'package:dbus/dbus.dart';
 
 import 'xdg_portal_request.dart';
