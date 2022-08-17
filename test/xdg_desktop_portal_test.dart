@@ -277,6 +277,8 @@ class MockPortalObject extends DBusObject {
         return handleOpenURIMethodCall(methodCall);
       case 'org.freedesktop.portal.ProxyResolver':
         return handleProxyResolverMethodCall(methodCall);
+      case 'org.freedesktop.portal.Secret':
+        return handleSecretMethodCall(methodCall);
       case 'org.freedesktop.portal.Settings':
         return handleSettingsMethodCall(methodCall);
       default:
@@ -562,6 +564,24 @@ class MockPortalObject extends DBusObject {
     }
   }
 
+  Future<DBusMethodResponse> handleSecretMethodCall(
+      DBusMethodCall methodCall) async {
+    switch (methodCall.name) {
+      case 'RetrieveSecret':
+        var handle = methodCall.values[0].asUnixFd();
+        await handle.toFile().writeFrom(server.secret);
+        var options = methodCall.values[1].asStringVariantDict();
+        var token =
+            options['handle_token']?.asString() ?? server.generateToken();
+        options.removeWhere((key, value) => key == 'handle_token');
+        var request = await server.addRequest(methodCall.sender, token);
+        Future.delayed(Duration.zero, () async => await request.respond());
+        return DBusMethodSuccessResponse([request.path]);
+      default:
+        return DBusMethodErrorResponse.unknownMethod();
+    }
+  }
+
   Future<DBusMethodResponse> handleSettingsMethodCall(
       DBusMethodCall methodCall) async {
     switch (methodCall.name) {
@@ -616,6 +636,8 @@ class MockPortalObject extends DBusObject {
         return getOpenURIProperty(name);
       case 'org.freedesktop.portal.ProxyResolver':
         return getProxyResolverProperty(name);
+      case 'org.freedesktop.portal.Secret':
+        return getSecretProperty(name);
       case 'org.freedesktop.portal.Settings':
         return getSettingsProperty(name);
       default:
@@ -713,6 +735,15 @@ class MockPortalObject extends DBusObject {
     }
   }
 
+  Future<DBusMethodResponse> getSecretProperty(String name) async {
+    switch (name) {
+      case 'version':
+        return DBusGetPropertyResponse(DBusUint32(1));
+      default:
+        return DBusMethodErrorResponse.unknownProperty();
+    }
+  }
+
   Future<DBusMethodResponse> getSettingsProperty(String name) async {
     switch (name) {
       case 'version':
@@ -751,6 +782,7 @@ class MockPortalServer extends DBusClient {
   bool networkAvailable;
   bool networkMetered;
   int networkConnectivity;
+  List<int> secret;
 
   final accountDialogs = <MockAccountDialog>[];
   final background = <MockBackground>[];
@@ -764,22 +796,24 @@ class MockPortalServer extends DBusClient {
       _locationSessions.values;
   final _locationSessions = <DBusObjectPath, MockLocationSession>{};
 
-  MockPortalServer(DBusAddress clientAddress,
-      {this.userId,
-      this.userName,
-      this.userImage,
-      this.openFileResponse,
-      this.saveFileResponse,
-      this.saveFilesResponse,
-      Map<String, Map<String, DBusValue>>? notifications,
-      this.proxies = const {},
-      this.settingsValues = const {},
-      this.locations = const [],
-      this.closeLocationSession = false,
-      this.networkAvailable = true,
-      this.networkMetered = false,
-      this.networkConnectivity = 3})
-      : super(clientAddress) {
+  MockPortalServer(
+    DBusAddress clientAddress, {
+    this.userId,
+    this.userName,
+    this.userImage,
+    this.openFileResponse,
+    this.saveFileResponse,
+    this.saveFilesResponse,
+    Map<String, Map<String, DBusValue>>? notifications,
+    this.proxies = const {},
+    this.settingsValues = const {},
+    this.locations = const [],
+    this.closeLocationSession = false,
+    this.networkAvailable = true,
+    this.networkMetered = false,
+    this.networkConnectivity = 3,
+    this.secret = const [],
+  }) : super(clientAddress) {
     _root = MockPortalObject(this);
     this.notifications = notifications ?? {};
   }
@@ -2128,6 +2162,30 @@ void main() {
 
     expect(await client.proxyResolver.lookup('http://example.com'),
         equals(['http://localhost:1234']));
+  });
+
+  test('secret', () async {
+    var server = DBusServer();
+    var clientAddress =
+        await server.listenAddress(DBusAddress.unix(dir: Directory.systemTemp));
+    addTearDown(() async {
+      await server.close();
+    });
+
+    Uint8List secret = Uint8List.fromList(<int>[0, 100, 200, 255]);
+    var portalServer = MockPortalServer(clientAddress, secret: secret);
+    await portalServer.start();
+    addTearDown(() async {
+      await portalServer.close();
+    });
+
+    var client = XdgDesktopPortalClient(bus: DBusClient(clientAddress));
+    addTearDown(() async {
+      await client.close();
+    });
+
+    expect(await client.secret.getVersion(), equals(1));
+    expect(await client.secret.retrieveSecret(), equals(secret));
   });
 
   test('settings read', () async {
