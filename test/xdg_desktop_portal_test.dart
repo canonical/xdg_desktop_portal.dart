@@ -302,6 +302,8 @@ class MockPortalDesktopObject extends DBusObject {
         return handleFileChooserMethodCall(methodCall);
       case 'org.freedesktop.portal.Location':
         return handleLocationMethodCall(methodCall);
+      case 'org.freedesktop.portal.MemoryMonitor':
+        return handleMemoryMonitorMethodCall(methodCall);
       case 'org.freedesktop.portal.NetworkMonitor':
         return handleNetworkMonitorMethodCall(methodCall);
       case 'org.freedesktop.portal.Notification':
@@ -537,6 +539,14 @@ class MockPortalDesktopObject extends DBusObject {
     }
   }
 
+  Future<DBusMethodResponse> handleMemoryMonitorMethodCall(
+      DBusMethodCall methodCall) async {
+    switch (methodCall.name) {
+      default:
+        return DBusMethodErrorResponse.unknownMethod();
+    }
+  }
+
   Future<DBusMethodResponse> handleNetworkMonitorMethodCall(
       DBusMethodCall methodCall) async {
     switch (methodCall.name) {
@@ -711,6 +721,8 @@ class MockPortalDesktopObject extends DBusObject {
         return getFileChooserProperty(name);
       case 'org.freedesktop.portal.Location':
         return getLocationProperty(name);
+      case 'org.freedesktop.portal.MemoryMonitor':
+        return getMemoryMonitorProperty(name);
       case 'org.freedesktop.portal.NetworkMonitor':
         return getNetworkMonitorProperty(name);
       case 'org.freedesktop.portal.Notification':
@@ -784,6 +796,15 @@ class MockPortalDesktopObject extends DBusObject {
   }
 
   Future<DBusMethodResponse> getLocationProperty(String name) async {
+    switch (name) {
+      case 'version':
+        return DBusGetPropertyResponse(DBusUint32(1));
+      default:
+        return DBusMethodErrorResponse.unknownProperty();
+    }
+  }
+
+  Future<DBusMethodResponse> getMemoryMonitorProperty(String name) async {
     switch (name) {
       case 'version':
         return DBusGetPropertyResponse(DBusUint32(1));
@@ -2247,6 +2268,28 @@ void main() {
               timestamp: DateTime.fromMicrosecondsSinceEpoch(1658718569000000)),
           emitsDone
         ]));
+  });
+
+  test('memory monitor', () async {
+    var server = DBusServer();
+    var clientAddress =
+        await server.listenAddress(DBusAddress.unix(dir: Directory.systemTemp));
+    addTearDown(() async {
+      await server.close();
+    });
+
+    var portalServer = MockPortalDesktopServer(clientAddress);
+    await portalServer.start();
+    addTearDown(() async {
+      await portalServer.close();
+    });
+
+    var client = XdgDesktopPortalClient(bus: DBusClient(clientAddress));
+    addTearDown(() async {
+      await client.close();
+    });
+
+    expect(await client.memoryMonitor.getVersion(), equals(1));
   });
 
   test('network monitor - status', () async {
