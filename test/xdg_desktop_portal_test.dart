@@ -310,6 +310,8 @@ class MockPortalDesktopObject extends DBusObject {
         return handleOpenURIMethodCall(methodCall);
       case 'org.freedesktop.portal.ProxyResolver':
         return handleProxyResolverMethodCall(methodCall);
+      case 'org.freedesktop.portal.RemoteDesktop':
+        return handleRemoteDesktopMethodCall(methodCall);
       case 'org.freedesktop.portal.ScreenCast':
         return handleScreenCastMethodCall(methodCall);
       case 'org.freedesktop.portal.Secret':
@@ -599,6 +601,14 @@ class MockPortalDesktopObject extends DBusObject {
     }
   }
 
+  Future<DBusMethodResponse> handleRemoteDesktopMethodCall(
+      DBusMethodCall methodCall) async {
+    switch (methodCall.name) {
+      default:
+        return DBusMethodErrorResponse.unknownMethod();
+    }
+  }
+
   Future<DBusMethodResponse> handleScreenCastMethodCall(
       DBusMethodCall methodCall) async {
     switch (methodCall.name) {
@@ -679,6 +689,8 @@ class MockPortalDesktopObject extends DBusObject {
         return getOpenURIProperty(name);
       case 'org.freedesktop.portal.ProxyResolver':
         return getProxyResolverProperty(name);
+      case 'org.freedesktop.portal.RemoteDesktop':
+        return getRemoteDesktopProperty(name);
       case 'org.freedesktop.portal.ScreenCast':
         return getScreenCastProperty(name);
       case 'org.freedesktop.portal.Secret':
@@ -772,6 +784,15 @@ class MockPortalDesktopObject extends DBusObject {
   }
 
   Future<DBusMethodResponse> getProxyResolverProperty(String name) async {
+    switch (name) {
+      case 'version':
+        return DBusGetPropertyResponse(DBusUint32(1));
+      default:
+        return DBusMethodErrorResponse.unknownProperty();
+    }
+  }
+
+  Future<DBusMethodResponse> getRemoteDesktopProperty(String name) async {
     switch (name) {
       case 'version':
         return DBusGetPropertyResponse(DBusUint32(1));
@@ -2507,6 +2528,28 @@ void main() {
             'activation_token': DBusString('token')
           })
         ]));
+  });
+
+  test('remote desktop', () async {
+    var server = DBusServer();
+    var clientAddress =
+        await server.listenAddress(DBusAddress.unix(dir: Directory.systemTemp));
+    addTearDown(() async {
+      await server.close();
+    });
+
+    var portalServer = MockPortalDesktopServer(clientAddress);
+    await portalServer.start();
+    addTearDown(() async {
+      await portalServer.close();
+    });
+
+    var client = XdgDesktopPortalClient(bus: DBusClient(clientAddress));
+    addTearDown(() async {
+      await client.close();
+    });
+
+    expect(await client.remoteDesktop.getVersion(), equals(1));
   });
 
   test('proxy resolver', () async {
