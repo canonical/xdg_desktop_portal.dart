@@ -4,6 +4,8 @@ import 'xdg_portal_request.dart';
 
 enum XdgRemoteDesktopDeviceType { none, keyboard, pointer, touchscreen }
 
+enum XdgRemoteDesktopButtonState { released, pressed }
+
 /// Remote desktop portal.
 class XdgRemoteDesktopPortal {
   final DBusRemoteObject _object;
@@ -95,5 +97,61 @@ class XdgRemoteDesktopPortal {
       devices.add(XdgRemoteDesktopDeviceType.touchscreen);
     }
     return devices;
+  }
+
+  /// Notify about a new relative pointer motion event.
+  /// The (dx, dy) vector represents the new pointer position in the streams logical coordinate space.
+  Future<void> notifyPointerMotion(
+      {required double dx, required double dy}) async {
+    var options = <String, DBusValue>{};
+    await _object.callMethod(
+      'org.freedesktop.portal.RemoteDesktop',
+      'NotifyPointerMotion',
+      [
+        _sessionPath!,
+        DBusDict.stringVariant(options),
+        DBusDouble(dx),
+        DBusDouble(dy),
+      ],
+      replySignature: DBusSignature(''),
+    );
+  }
+
+  /// Notify about a new absolute pointer motion event.
+  /// The (x, y) position represents the new pointer position in the streams logical coordinate space.
+  Future<void> notifyPointerMotionAbsolute(
+      {required int nodeId, required double x, required double y}) async {
+    var options = <String, DBusValue>{};
+    await _object.callMethod(
+      'org.freedesktop.portal.RemoteDesktop',
+      'NotifyPointerMotionAbsolute',
+      [
+        _sessionPath!,
+        DBusDict.stringVariant(options),
+        DBusUint32(nodeId),
+        DBusDouble(x),
+        DBusDouble(y),
+      ],
+      replySignature: DBusSignature(''),
+    );
+  }
+
+  /// Notify about a new relative pointer motion event.
+  /// The (dx, dy) vector represents the new pointer position in the streams logical coordinate space.
+  Future<void> notifyPointerButton(
+      {required int button, required XdgRemoteDesktopButtonState state}) async {
+    //TODO: May only be called if POINTER access was provided after starting the session.
+    var options = <String, DBusValue>{};
+    await _object.callMethod(
+      'org.freedesktop.portal.RemoteDesktop',
+      'NotifyPointerButton',
+      [
+        _sessionPath!,
+        DBusDict.stringVariant(options),
+        DBusInt32(button),
+        DBusUint32(state.index),
+      ],
+      replySignature: DBusSignature(''),
+    );
   }
 }
