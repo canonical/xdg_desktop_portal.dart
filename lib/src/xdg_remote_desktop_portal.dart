@@ -6,6 +6,12 @@ enum XdgRemoteDesktopDeviceType { none, keyboard, pointer, touchscreen }
 
 enum XdgRemoteDesktopButtonState { released, pressed }
 
+enum XdgRemoteDesktopKeyboardKeyState { released, pressed }
+
+enum XdgRemoteDesktopKeyboardKeysymState { released, pressed }
+
+enum XdgRemoteDesktopAxisScroll { vertical, horizontal }
+
 /// Remote desktop portal.
 class XdgRemoteDesktopPortal {
   final DBusRemoteObject _object;
@@ -19,6 +25,26 @@ class XdgRemoteDesktopPortal {
       .getProperty('org.freedesktop.portal.Secret', 'version',
           signature: DBusSignature('u'))
       .then((v) => v.asUint32());
+
+  /// Get available device types.
+  Future<Set<XdgRemoteDesktopDeviceType>> getAvailableDeviceTypes() => _object
+          .getProperty(
+              'org.freedesktop.portal.RemoteDesktop', 'AvailableDeviceTypes',
+              signature: DBusSignature('u'))
+          .then((v) {
+        final deviceTypesValue = v.asUint32();
+        final deviceTypes = <XdgRemoteDesktopDeviceType>{};
+        if (deviceTypesValue & 1 != 0) {
+          deviceTypes.add(XdgRemoteDesktopDeviceType.keyboard);
+        }
+        if (deviceTypesValue & 2 != 0) {
+          deviceTypes.add(XdgRemoteDesktopDeviceType.pointer);
+        }
+        if (deviceTypesValue & 4 != 0) {
+          deviceTypes.add(XdgRemoteDesktopDeviceType.touchscreen);
+        }
+        return deviceTypes;
+      });
 
   /// Create a remote desktop portal.
   Future<Set<XdgRemoteDesktopDeviceType>> createSession(
@@ -136,11 +162,10 @@ class XdgRemoteDesktopPortal {
     );
   }
 
-  /// Notify about a new relative pointer motion event.
-  /// The (dx, dy) vector represents the new pointer position in the streams logical coordinate space.
+  /// The pointer button is encoded according to Linux Evdev button codes.
+  /// May only be called if POINTER access was provided after starting the session.
   Future<void> notifyPointerButton(
       {required int button, required XdgRemoteDesktopButtonState state}) async {
-    //TODO: May only be called if POINTER access was provided after starting the session.
     var options = <String, DBusValue>{};
     await _object.callMethod(
       'org.freedesktop.portal.RemoteDesktop',
@@ -150,6 +175,146 @@ class XdgRemoteDesktopPortal {
         DBusDict.stringVariant(options),
         DBusInt32(button),
         DBusUint32(state.index),
+      ],
+      replySignature: DBusSignature(''),
+    );
+  }
+
+  /// The axis movement from a 'smooth scroll' device, such as a touchpad.
+  /// When applicable, the size of the motion delta should be equivalent
+  /// to the motion vector of a pointer motion done using the same advice.
+  /// May only be called if POINTER access was provided after starting the session.
+  Future<void> notifyPointerAxis(
+      {required double dx, required double dy, bool? finish}) async {
+    var options = <String, DBusValue>{};
+    if (finish != null) {
+      options['finish'] = DBusBoolean(finish);
+    }
+    await _object.callMethod(
+      'org.freedesktop.portal.RemoteDesktop',
+      'NotifyPointerAxis',
+      [
+        _sessionPath!,
+        DBusDict.stringVariant(options),
+        DBusDouble(dx),
+        DBusDouble(dy),
+      ],
+      replySignature: DBusSignature(''),
+    );
+  }
+
+  /// May only be called if POINTER access was provided after starting the session.
+  Future<void> notifyPointerAxisDiscrete(
+      {required XdgRemoteDesktopAxisScroll axis, required int steps}) async {
+    var options = <String, DBusValue>{};
+    await _object.callMethod(
+      'org.freedesktop.portal.RemoteDesktop',
+      'NotifyPointerAxisDiscrete',
+      [
+        _sessionPath!,
+        DBusDict.stringVariant(options),
+        DBusUint32(axis.index),
+        DBusInt32(steps),
+      ],
+      replySignature: DBusSignature(''),
+    );
+  }
+
+  /// May only be called if KEYBOARD access was provided after starting the session.
+  Future<void> notifyKeyboardKeycode(
+      {required int keycode,
+      required XdgRemoteDesktopKeyboardKeyState state}) async {
+    var options = <String, DBusValue>{};
+    await _object.callMethod(
+      'org.freedesktop.portal.RemoteDesktop',
+      'NotifyKeyboardKeycode',
+      [
+        _sessionPath!,
+        DBusDict.stringVariant(options),
+        DBusInt32(keycode),
+        DBusUint32(state.index),
+      ],
+      replySignature: DBusSignature(''),
+    );
+  }
+
+  /// May only be called if KEYBOARD access was provided after starting the session.
+  Future<void> notifyKeyboardKeysym(
+      {required int keysym,
+      required XdgRemoteDesktopKeyboardKeysymState state}) async {
+    var options = <String, DBusValue>{};
+    await _object.callMethod(
+      'org.freedesktop.portal.RemoteDesktop',
+      'NotifyKeyboardKeysym',
+      [
+        _sessionPath!,
+        DBusDict.stringVariant(options),
+        DBusInt32(keysym),
+        DBusUint32(state.index),
+      ],
+      replySignature: DBusSignature(''),
+    );
+  }
+
+  /// Notify about a new touch down event. The (x, y) position represents the
+  /// new touch point position in the streams logical coordinate space.
+  /// May only be called if TOUCHSCREEN access was provided after starting the session.
+  Future<void> notifyTouchDown(
+      {required int nodeId,
+      required int slot,
+      required double x,
+      required double y}) async {
+    var options = <String, DBusValue>{};
+    await _object.callMethod(
+      'org.freedesktop.portal.RemoteDesktop',
+      'NotifyTouchDown',
+      [
+        _sessionPath!,
+        DBusDict.stringVariant(options),
+        DBusUint32(nodeId),
+        DBusUint32(slot),
+        DBusDouble(x),
+        DBusDouble(y),
+      ],
+      replySignature: DBusSignature(''),
+    );
+  }
+
+  /// Notify about a new touch motion event.
+  /// The (x, y) position represents where the touch point position in the streams logical coordinate space moved.
+  /// May only be called if TOUCHSCREEN access was provided after starting the session.
+  Future<void> notifyTouchMotion(
+      {required int nodeId,
+      required int slot,
+      required double x,
+      required double y}) async {
+    var options = <String, DBusValue>{};
+    await _object.callMethod(
+      'org.freedesktop.portal.RemoteDesktop',
+      'NotifyTouchMotion',
+      [
+        _sessionPath!,
+        DBusDict.stringVariant(options),
+        DBusUint32(nodeId),
+        DBusUint32(slot),
+        DBusDouble(x),
+        DBusDouble(y),
+      ],
+      replySignature: DBusSignature(''),
+    );
+  }
+
+  /// Notify about a new touch up event.
+  /// May only be called if TOUCHSCREEN access was provided after starting the session.
+  Future<void> notifyTouchUp({required int slot}) async {
+    var options = <String, DBusValue>{};
+    await _object.callMethod(
+      'org.freedesktop.portal.RemoteDesktop',
+      'NotifyTouchUp',
+      [
+        _sessionPath!,
+        DBusDict.stringVariant(options),
+        DBusUint32(slot),
       ],
       replySignature: DBusSignature(''),
     );
