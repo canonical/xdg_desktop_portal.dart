@@ -82,6 +82,31 @@ class MockCamera {
   String toString() => '$runtimeType($options)';
 }
 
+class MockRemoteDesktop {
+  final String parentWindow;
+  final Map<String, DBusValue> options;
+
+  MockRemoteDesktop(this.parentWindow, this.options);
+
+  @override
+  int get hashCode => Object.hash(
+      parentWindow,
+      Object.hashAll(
+          options.entries.map((entry) => Object.hash(entry.key, entry.value))));
+
+  @override
+  bool operator ==(other) {
+    if (identical(this, other)) return true;
+    final mapEquals = const DeepCollectionEquality().equals;
+    return other is MockRemoteDesktop &&
+        other.parentWindow == parentWindow &&
+        mapEquals(other.options, options);
+  }
+
+  @override
+  String toString() => '$runtimeType($parentWindow, $options)';
+}
+
 class MockEmail {
   final String parentWindow;
   final Map<String, DBusValue> options;
@@ -277,6 +302,8 @@ class MockPortalObject extends DBusObject {
         return handleOpenURIMethodCall(methodCall);
       case 'org.freedesktop.portal.ProxyResolver':
         return handleProxyResolverMethodCall(methodCall);
+      case 'org.freedesktop.portal.RemoteDesktop':
+        return handleRemoteDesktopMethodCall(methodCall);
       case 'org.freedesktop.portal.Secret':
         return handleSecretMethodCall(methodCall);
       case 'org.freedesktop.portal.Settings':
@@ -564,6 +591,166 @@ class MockPortalObject extends DBusObject {
     }
   }
 
+  Future<DBusMethodResponse> handleRemoteDesktopMethodCall(
+      DBusMethodCall methodCall) async {
+    switch (methodCall.name) {
+      case 'CreateSession':
+        var options = methodCall.values[0].asStringVariantDict();
+        server.remoteDesktop.add(MockRemoteDesktop('', options));
+        var token =
+            options['handle_token']?.asString() ?? server.generateToken();
+        options.removeWhere((key, value) => key == 'handle_token');
+        options.removeWhere((key, value) => key == 'session_handle_token');
+        var request = await server.addRequest(methodCall.sender, token);
+        Future.delayed(
+            Duration.zero,
+            () async => await request.respond(result: <String, DBusValue>{
+                  'session_handle':
+                      DBusString(server.remoteDesktopSessionHandle!)
+                }));
+        return DBusMethodSuccessResponse([request.path]);
+      case 'SelectDevices':
+        var options = methodCall.values[1].asStringVariantDict();
+        server.remoteDesktopSelectedDivice = options['types']?.asUint32();
+        server.remoteDesktop.add(MockRemoteDesktop('', options));
+        var token =
+            options['handle_token']?.asString() ?? server.generateToken();
+        options.removeWhere((key, value) => key == 'handle_token');
+        var request = await server.addRequest(methodCall.sender, token);
+        Future.delayed(Duration.zero, () async => await request.respond());
+        return DBusMethodSuccessResponse([request.path]);
+      case 'Start':
+        var parentWindow = methodCall.values[1].asString();
+        var options = methodCall.values[2].asStringVariantDict();
+        server.remoteDesktop.add(MockRemoteDesktop(parentWindow, options));
+        var token =
+            options['handle_token']?.asString() ?? server.generateToken();
+        options.removeWhere((key, value) => key == 'handle_token');
+        var request = await server.addRequest(methodCall.sender, token);
+        var result = <String, DBusValue>{};
+        result['devices'] = DBusUint32(server.remoteDesktopSelectedDivice ?? 0);
+        Future.delayed(
+            Duration.zero, () async => await request.respond(result: result));
+        return DBusMethodSuccessResponse([request.path]);
+      case 'NotifyPointerMotion':
+        if (server.remoteDesktopSelectedDivice != null &&
+            server.remoteDesktopSelectedDivice! & 2 != 0) {
+          server.remoteDesktop.add(MockRemoteDesktop(
+              '', {'dx': methodCall.values[2], 'dy': methodCall.values[3]}));
+          return DBusMethodSuccessResponse();
+        } else {
+          return DBusMethodErrorResponse.failed(
+              "Session doesn't have access to a device of type: pointer");
+        }
+      case 'NotifyPointerMotionAbsolute':
+        if (server.remoteDesktopSelectedDivice != null &&
+            server.remoteDesktopSelectedDivice! & 2 != 0) {
+          server.remoteDesktop.add(MockRemoteDesktop('', {
+            'stream': methodCall.values[2],
+            'x': methodCall.values[3],
+            'y': methodCall.values[4]
+          }));
+          return DBusMethodSuccessResponse();
+        } else {
+          return DBusMethodErrorResponse.failed(
+              "Session doesn't have access to a device of type: pointer");
+        }
+      case 'NotifyPointerButton':
+        if (server.remoteDesktopSelectedDivice != null &&
+            server.remoteDesktopSelectedDivice! & 2 != 0) {
+          server.remoteDesktop.add(MockRemoteDesktop('',
+              {'button': methodCall.values[2], 'state': methodCall.values[3]}));
+          return DBusMethodSuccessResponse();
+        } else {
+          return DBusMethodErrorResponse.failed(
+              "Session doesn't have access to a device of type: pointer");
+        }
+      case 'NotifyPointerAxis':
+        if (server.remoteDesktopSelectedDivice != null &&
+            server.remoteDesktopSelectedDivice! & 2 != 0) {
+          server.remoteDesktop.add(MockRemoteDesktop(
+              '', {'dx': methodCall.values[2], 'dy': methodCall.values[3]}));
+          return DBusMethodSuccessResponse();
+        } else {
+          return DBusMethodErrorResponse.failed(
+              "Session doesn't have access to a device of type: pointer");
+        }
+      case 'NotifyPointerAxisDiscrete':
+        if (server.remoteDesktopSelectedDivice != null &&
+            server.remoteDesktopSelectedDivice! & 2 != 0) {
+          server.remoteDesktop.add(MockRemoteDesktop('',
+              {'axis': methodCall.values[2], 'steps': methodCall.values[3]}));
+          return DBusMethodSuccessResponse();
+        } else {
+          return DBusMethodErrorResponse.failed(
+              "Session doesn't have access to a device of type: pointer");
+        }
+      case 'NotifyKeyboardKeycode':
+        if (server.remoteDesktopSelectedDivice != null &&
+            server.remoteDesktopSelectedDivice! & 1 != 0) {
+          server.remoteDesktop.add(MockRemoteDesktop('', {
+            'keycode': methodCall.values[2],
+            'state': methodCall.values[3]
+          }));
+          return DBusMethodSuccessResponse();
+        } else {
+          return DBusMethodErrorResponse.failed(
+              "Session doesn't have access to a device of type: keyboard");
+        }
+      case 'NotifyKeyboardKeysym':
+        if (server.remoteDesktopSelectedDivice != null &&
+            server.remoteDesktopSelectedDivice! & 1 != 0) {
+          server.remoteDesktop.add(MockRemoteDesktop('',
+              {'keysym': methodCall.values[2], 'state': methodCall.values[3]}));
+          return DBusMethodSuccessResponse();
+        } else {
+          return DBusMethodErrorResponse.failed(
+              "Session doesn't have access to a device of type: keyboard");
+        }
+      case 'NotifyTouchDown':
+        if (server.remoteDesktopSelectedDivice != null &&
+            server.remoteDesktopSelectedDivice! & 4 != 0) {
+          server.remoteDesktop.add(MockRemoteDesktop('', {
+            'stream': methodCall.values[2],
+            'slot': methodCall.values[3],
+            'x': methodCall.values[4],
+            'y': methodCall.values[5],
+          }));
+          return DBusMethodSuccessResponse();
+        } else {
+          return DBusMethodErrorResponse.failed(
+              "Session doesn't have access to a device of type: touch");
+        }
+      case 'NotifyTouchMotion':
+        if (server.remoteDesktopSelectedDivice != null &&
+            server.remoteDesktopSelectedDivice! & 4 != 0) {
+          server.remoteDesktop.add(MockRemoteDesktop('', {
+            'stream': methodCall.values[2],
+            'slot': methodCall.values[3],
+            'x': methodCall.values[4],
+            'y': methodCall.values[5],
+          }));
+          return DBusMethodSuccessResponse();
+        } else {
+          return DBusMethodErrorResponse.failed(
+              "Session doesn't have access to a device of type: touch");
+        }
+      case 'NotifyTouchUp':
+        if (server.remoteDesktopSelectedDivice != null &&
+            server.remoteDesktopSelectedDivice! & 4 != 0) {
+          server.remoteDesktop
+              .add(MockRemoteDesktop('', {'slot': methodCall.values[2]}));
+          return DBusMethodSuccessResponse();
+        } else {
+          return DBusMethodErrorResponse.failed(
+              "Session doesn't have access to a device of type: touch");
+        }
+
+      default:
+        return DBusMethodErrorResponse.unknownMethod();
+    }
+  }
+
   Future<DBusMethodResponse> handleSecretMethodCall(
       DBusMethodCall methodCall) async {
     switch (methodCall.name) {
@@ -636,6 +823,8 @@ class MockPortalObject extends DBusObject {
         return getOpenURIProperty(name);
       case 'org.freedesktop.portal.ProxyResolver':
         return getProxyResolverProperty(name);
+      case 'org.freedesktop.portal.RemoteDesktop':
+        return getRemoteDesktopProperty(name);
       case 'org.freedesktop.portal.Secret':
         return getSecretProperty(name);
       case 'org.freedesktop.portal.Settings':
@@ -735,6 +924,17 @@ class MockPortalObject extends DBusObject {
     }
   }
 
+  Future<DBusMethodResponse> getRemoteDesktopProperty(String name) async {
+    switch (name) {
+      case 'version':
+        return DBusGetPropertyResponse(DBusUint32(1));
+      case 'AvailableDeviceTypes':
+        return DBusGetPropertyResponse(DBusUint32(7));
+      default:
+        return DBusMethodErrorResponse.unknownProperty();
+    }
+  }
+
   Future<DBusMethodResponse> getSecretProperty(String name) async {
     switch (name) {
       case 'version':
@@ -783,6 +983,8 @@ class MockPortalServer extends DBusClient {
   bool networkMetered;
   int networkConnectivity;
   List<int> secret;
+  final String? remoteDesktopSessionHandle;
+  late final int? remoteDesktopSelectedDivice;
 
   final accountDialogs = <MockAccountDialog>[];
   final background = <MockBackground>[];
@@ -795,6 +997,7 @@ class MockPortalServer extends DBusClient {
   Iterable<MockLocationSession> get locationSessions =>
       _locationSessions.values;
   final _locationSessions = <DBusObjectPath, MockLocationSession>{};
+  final remoteDesktop = <MockRemoteDesktop>[];
 
   MockPortalServer(
     DBusAddress clientAddress, {
@@ -812,6 +1015,7 @@ class MockPortalServer extends DBusClient {
     this.networkAvailable = true,
     this.networkMetered = false,
     this.networkConnectivity = 3,
+    this.remoteDesktopSessionHandle,
     this.secret = const [],
   }) : super(clientAddress) {
     _root = MockPortalObject(this);
@@ -2135,6 +2339,170 @@ void main() {
             'activation_token': DBusString('token')
           })
         ]));
+  });
+
+  test('remote desktop', () async {
+    var server = DBusServer();
+    var clientAddress =
+        await server.listenAddress(DBusAddress.unix(dir: Directory.systemTemp));
+    addTearDown(() async {
+      await server.close();
+    });
+
+    var portalServer = MockPortalServer(
+      clientAddress,
+      remoteDesktopSessionHandle:
+          '/org/freedesktop/portal/desktop/session/456/dart456',
+    );
+    await portalServer.start();
+    addTearDown(() async {
+      await portalServer.close();
+    });
+
+    var client = XdgDesktopPortalClient(bus: DBusClient(clientAddress));
+    addTearDown(() async {
+      await client.close();
+    });
+    expect(await client.remoteDesktop.getVersion(), equals(1));
+    expect(
+        await client.remoteDesktop.getAvailableDeviceTypes(),
+        equals(<XdgRemoteDesktopDeviceType>{
+          XdgRemoteDesktopDeviceType.pointer,
+          XdgRemoteDesktopDeviceType.keyboard,
+          XdgRemoteDesktopDeviceType.touchscreen
+        }));
+
+    expect(
+        await client.remoteDesktop.createSession(
+            parentWindow: 'x11:12345',
+            deviceTypes: <XdgRemoteDesktopDeviceType>{
+              XdgRemoteDesktopDeviceType.pointer,
+              XdgRemoteDesktopDeviceType.keyboard
+            }),
+        equals(<XdgRemoteDesktopDeviceType>{
+          XdgRemoteDesktopDeviceType.pointer,
+          XdgRemoteDesktopDeviceType.keyboard
+        }));
+
+    expect(portalServer.remoteDesktop, [
+      MockRemoteDesktop('', {}),
+      MockRemoteDesktop('', {'types': DBusUint32(3)}),
+      MockRemoteDesktop('x11:12345', {})
+    ]);
+  });
+
+  test('remote desktop notifiers of pointer', () async {
+    var server = DBusServer();
+    var clientAddress =
+        await server.listenAddress(DBusAddress.unix(dir: Directory.systemTemp));
+    addTearDown(() async {
+      await server.close();
+    });
+
+    var portalServer = MockPortalServer(
+      clientAddress,
+      remoteDesktopSessionHandle:
+          '/org/freedesktop/portal/desktop/session/456/dart456',
+    );
+    await portalServer.start();
+    addTearDown(() async {
+      await portalServer.close();
+    });
+
+    var client = XdgDesktopPortalClient(bus: DBusClient(clientAddress));
+    addTearDown(() async {
+      await client.close();
+    });
+    expect(
+        await client.remoteDesktop.createSession(
+            parentWindow: 'x11:12345',
+            deviceTypes: {XdgRemoteDesktopDeviceType.pointer}),
+        equals({XdgRemoteDesktopDeviceType.pointer}));
+
+    await client.remoteDesktop.notifyPointerMotion(dx: 100.1, dy: 200.2);
+    expect(
+        portalServer.remoteDesktop.last,
+        MockRemoteDesktop(
+            '', {'dx': DBusDouble(100.1), 'dy': DBusDouble(200.2)}));
+
+    await client.remoteDesktop.notifyPointerButton(
+        button: 0x110, state: XdgRemoteDesktopButtonState.pressed);
+    expect(
+        portalServer.remoteDesktop.last,
+        MockRemoteDesktop(
+            '', {'button': DBusInt32(0x110), 'state': DBusUint32(1)}));
+    await client.remoteDesktop.notifyPointerButton(
+        button: 0x110, state: XdgRemoteDesktopButtonState.released);
+    expect(
+        portalServer.remoteDesktop.last,
+        MockRemoteDesktop(
+            '', {'button': DBusInt32(0x110), 'state': DBusUint32(0)}));
+
+    await client.remoteDesktop.notifyPointerAxis(dx: 0.0, dy: 20.0);
+    expect(portalServer.remoteDesktop.last,
+        MockRemoteDesktop('', {'dx': DBusDouble(0), 'dy': DBusDouble(20)}));
+
+    await client.remoteDesktop.notifyPointerAxisDiscrete(
+        axis: XdgRemoteDesktopAxisScroll.vertical, steps: -5);
+    expect(portalServer.remoteDesktop.last,
+        MockRemoteDesktop('', {'axis': DBusUint32(0), 'steps': DBusInt32(-5)}));
+  });
+
+  test('remote desktop notifiers of keyboard', () async {
+    var server = DBusServer();
+    var clientAddress =
+        await server.listenAddress(DBusAddress.unix(dir: Directory.systemTemp));
+    addTearDown(() async {
+      await server.close();
+    });
+
+    var portalServer = MockPortalServer(
+      clientAddress,
+      remoteDesktopSessionHandle:
+          '/org/freedesktop/portal/desktop/session/456/dart456',
+    );
+    await portalServer.start();
+    addTearDown(() async {
+      await portalServer.close();
+    });
+
+    var client = XdgDesktopPortalClient(bus: DBusClient(clientAddress));
+    addTearDown(() async {
+      await client.close();
+    });
+    expect(
+        await client.remoteDesktop.createSession(
+            parentWindow: 'x11:12345',
+            deviceTypes: {XdgRemoteDesktopDeviceType.keyboard}),
+        equals({XdgRemoteDesktopDeviceType.keyboard}));
+
+    await client.remoteDesktop.notifyKeyboardKeycode(
+        keycode: 125, state: XdgRemoteDesktopKeyboardKeyState.pressed);
+    expect(
+        portalServer.remoteDesktop.last,
+        MockRemoteDesktop(
+            '', {'keycode': DBusInt32(125), 'state': DBusUint32(1)}));
+    await client.remoteDesktop.notifyKeyboardKeycode(
+        keycode: 125, state: XdgRemoteDesktopKeyboardKeyState.released);
+    expect(
+        portalServer.remoteDesktop.last,
+        MockRemoteDesktop(
+            '', {'keycode': DBusInt32(125), 'state': DBusUint32(0)}));
+    await client.remoteDesktop.notifyKeyboardKeysym(
+        keysym: 'h'.codeUnitAt(0),
+        state: XdgRemoteDesktopKeyboardKeysymState.pressed);
+    expect(
+        portalServer.remoteDesktop.last,
+        MockRemoteDesktop('',
+            {'keysym': DBusInt32('h'.codeUnitAt(0)), 'state': DBusUint32(1)}));
+
+    await client.remoteDesktop.notifyKeyboardKeysym(
+        keysym: 'h'.codeUnitAt(0),
+        state: XdgRemoteDesktopKeyboardKeysymState.released);
+    expect(
+        portalServer.remoteDesktop.last,
+        MockRemoteDesktop('',
+            {'keysym': DBusInt32('h'.codeUnitAt(0)), 'state': DBusUint32(0)}));
   });
 
   test('proxy resolver', () async {
