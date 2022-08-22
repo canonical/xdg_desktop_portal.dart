@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.11
+
+* Add Secret, Documents portals.
+* Don't send empty reason by default on accounts portal.
+* Remove accidental code added to accounts example.
+
 ## 0.1.10
 
 * Add Background portal.
