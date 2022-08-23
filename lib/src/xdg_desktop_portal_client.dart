@@ -14,6 +14,7 @@ import 'xdg_network_monitor_portal.dart';
 import 'xdg_notification_portal.dart';
 import 'xdg_location_portal.dart';
 import 'xdg_open_uri_portal.dart';
+import 'xdg_print_portal.dart';
 import 'xdg_proxy_resolver_portal.dart';
 import 'xdg_remote_desktop_portal.dart';
 import 'xdg_screen_cast_portal.dart';
@@ -62,6 +63,9 @@ class XdgDesktopPortalClient {
   /// Portal to transfer files between applications.
   late final XdgFileTransferPortal fileTransfer;
 
+  /// Portal for printing.
+  late final XdgPrintPortal print;
+
   /// Portal to use system proxy.
   late final XdgProxyResolverPortal proxyResolver;
 
@@ -101,6 +105,7 @@ class XdgDesktopPortalClient {
     networkMonitor = XdgNetworkMonitorPortal(_desktopObject);
     notification = XdgNotificationPortal(_desktopObject);
     openUri = XdgOpenUriPortal(_desktopObject, _generateToken);
+    print = XdgPrintPortal(_desktopObject);
     proxyResolver = XdgProxyResolverPortal(_desktopObject);
     remoteDesktop = XdgRemoteDesktopPortal(_desktopObject);
     screenCast = XdgScreenCastPortal(_desktopObject);
