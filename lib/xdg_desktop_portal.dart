@@ -4,6 +4,7 @@ export 'src/xdg_desktop_portal_client.dart';
 export 'src/xdg_documents_portal.dart';
 export 'src/xdg_email_portal.dart';
 export 'src/xdg_file_chooser_portal.dart';
+export 'src/xdg_file_transfer_portal.dart';
 export 'src/xdg_network_monitor_portal.dart';
 export 'src/xdg_notification_portal.dart';
 export 'src/xdg_location_portal.dart';

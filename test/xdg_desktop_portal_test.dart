@@ -798,6 +798,8 @@ class MockPortalDocumentsObject extends DBusObject {
     switch (methodCall.interface) {
       case 'org.freedesktop.portal.Documents':
         return handleDocumentsMethodCall(methodCall);
+      case 'org.freedesktop.portal.FileTransfer':
+        return handleFileTransferMethodCall(methodCall);
       default:
         return DBusMethodErrorResponse.unknownInterface();
     }
@@ -858,11 +860,21 @@ class MockPortalDocumentsObject extends DBusObject {
     }
   }
 
+  Future<DBusMethodResponse> handleFileTransferMethodCall(
+      DBusMethodCall methodCall) async {
+    switch (methodCall.name) {
+      default:
+        return DBusMethodErrorResponse.unknownMethod();
+    }
+  }
+
   @override
   Future<DBusMethodResponse> getProperty(String interface, String name) async {
     switch (interface) {
       case 'org.freedesktop.portal.Documents':
         return getDocumentsProperty(name);
+      case 'org.freedesktop.portal.FileTransfer':
+        return getFileTransferProperty(name);
       default:
         return DBusMethodErrorResponse.unknownProperty();
     }
@@ -872,6 +884,15 @@ class MockPortalDocumentsObject extends DBusObject {
     switch (name) {
       case 'version':
         return DBusGetPropertyResponse(DBusUint32(4));
+      default:
+        return DBusMethodErrorResponse.unknownProperty();
+    }
+  }
+
+  Future<DBusMethodResponse> getFileTransferProperty(String name) async {
+    switch (name) {
+      case 'version':
+        return DBusGetPropertyResponse(DBusUint32(1));
       default:
         return DBusMethodErrorResponse.unknownProperty();
     }
@@ -1903,6 +1924,28 @@ void main() {
 
     var stream = client.fileChooser.openFile(title: 'Open File');
     expect(() => stream.first, throwsA(isA<XdgPortalRequestFailedException>()));
+  });
+
+  test('file transfer', () async {
+    var server = DBusServer();
+    var clientAddress =
+        await server.listenAddress(DBusAddress.unix(dir: Directory.systemTemp));
+    addTearDown(() async {
+      await server.close();
+    });
+
+    var portalServer = MockPortalDocumentsServer(clientAddress);
+    await portalServer.start();
+    addTearDown(() async {
+      await portalServer.close();
+    });
+
+    var client = XdgDesktopPortalClient(bus: DBusClient(clientAddress));
+    addTearDown(() async {
+      await client.close();
+    });
+
+    expect(await client.fileTransfer.getVersion(), equals(1));
   });
 
   test('location', () async {
