@@ -2,15 +2,22 @@ import 'package:dbus/dbus.dart';
 
 import 'xdg_portal_request.dart';
 
+/// Type of remote desktop device.
 enum XdgRemoteDesktopDeviceType { none, keyboard, pointer, touchscreen }
 
-enum XdgRemoteDesktopButtonState { released, pressed }
+/// The state of the remote desktop pointer button.
+enum XdgRemoteDesktopPointerButtonState { released, pressed }
 
+/// The scroll axis of the remote desktop pointer.
+enum XdgRemoteDesktopPointerAxisScroll { vertical, horizontal }
+
+/// The state of the remote desktop keyboard key.
 enum XdgRemoteDesktopKeyboardKeyState { released, pressed }
 
+/// The state of the remote desktop keyboard keysym.
 enum XdgRemoteDesktopKeyboardKeysymState { released, pressed }
 
-enum XdgRemoteDesktopAxisScroll { vertical, horizontal }
+
 
 /// Remote desktop portal.
 class XdgRemoteDesktopPortal {
@@ -165,7 +172,8 @@ class XdgRemoteDesktopPortal {
   /// The pointer button is encoded according to Linux Evdev button codes.
   /// May only be called if POINTER access was provided after starting the session.
   Future<void> notifyPointerButton(
-      {required int button, required XdgRemoteDesktopButtonState state}) async {
+      {required int button,
+      required XdgRemoteDesktopPointerButtonState state}) async {
     var options = <String, DBusValue>{};
     await _object.callMethod(
       'org.freedesktop.portal.RemoteDesktop',
@@ -205,7 +213,8 @@ class XdgRemoteDesktopPortal {
 
   /// May only be called if POINTER access was provided after starting the session.
   Future<void> notifyPointerAxisDiscrete(
-      {required XdgRemoteDesktopAxisScroll axis, required int steps}) async {
+      {required XdgRemoteDesktopPointerAxisScroll axis,
+      required int steps}) async {
     var options = <String, DBusValue>{};
     await _object.callMethod(
       'org.freedesktop.portal.RemoteDesktop',

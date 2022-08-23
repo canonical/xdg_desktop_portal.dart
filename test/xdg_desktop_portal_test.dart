@@ -2734,13 +2734,13 @@ void main() {
             '', {'dx': DBusDouble(100.1), 'dy': DBusDouble(200.2)}));
 
     await client.remoteDesktop.notifyPointerButton(
-        button: 0x110, state: XdgRemoteDesktopButtonState.pressed);
+        button: 0x110, state: XdgRemoteDesktopPointerButtonState.pressed);
     expect(
         portalServer.remoteDesktop.last,
         MockRemoteDesktop(
             '', {'button': DBusInt32(0x110), 'state': DBusUint32(1)}));
     await client.remoteDesktop.notifyPointerButton(
-        button: 0x110, state: XdgRemoteDesktopButtonState.released);
+        button: 0x110, state: XdgRemoteDesktopPointerButtonState.released);
     expect(
         portalServer.remoteDesktop.last,
         MockRemoteDesktop(
@@ -2751,7 +2751,7 @@ void main() {
         MockRemoteDesktop('', {'dx': DBusDouble(0), 'dy': DBusDouble(20)}));
 
     await client.remoteDesktop.notifyPointerAxisDiscrete(
-        axis: XdgRemoteDesktopAxisScroll.vertical, steps: -5);
+        axis: XdgRemoteDesktopPointerAxisScroll.vertical, steps: -5);
     expect(portalServer.remoteDesktop.last,
         MockRemoteDesktop('', {'axis': DBusUint32(0), 'steps': DBusInt32(-5)}));
   });

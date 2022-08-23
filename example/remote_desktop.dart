@@ -20,16 +20,16 @@ Future<void> notificationsPointer(XdgDesktopPortalClient client) async {
   // 3. Button.
   int btnLeft = 0x110; // left button
   await client.remoteDesktop.notifyPointerButton(
-      button: btnLeft, state: XdgRemoteDesktopButtonState.pressed);
+      button: btnLeft, state: XdgRemoteDesktopPointerButtonState.pressed);
   await client.remoteDesktop.notifyPointerButton(
-      button: btnLeft, state: XdgRemoteDesktopButtonState.released);
+      button: btnLeft, state: XdgRemoteDesktopPointerButtonState.released);
   await Future.delayed(Duration(seconds: 2));
   // 4. Axis.
   await client.remoteDesktop.notifyPointerAxis(dx: 0.0, dy: 20.0);
   await Future.delayed(Duration(seconds: 2));
   // 5. AxisDiscrete.
   await client.remoteDesktop.notifyPointerAxisDiscrete(
-      axis: XdgRemoteDesktopAxisScroll.vertical, steps: -5);
+      axis: XdgRemoteDesktopPointerAxisScroll.vertical, steps: -5);
   await Future.delayed(Duration(seconds: 1));
 }
 
