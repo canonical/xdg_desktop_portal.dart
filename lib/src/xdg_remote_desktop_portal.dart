@@ -17,8 +17,6 @@ enum XdgRemoteDesktopKeyboardKeyState { released, pressed }
 /// The state of the remote desktop keyboard keysym.
 enum XdgRemoteDesktopKeyboardKeysymState { released, pressed }
 
-
-
 /// Remote desktop portal.
 class XdgRemoteDesktopPortal {
   final DBusRemoteObject _object;
