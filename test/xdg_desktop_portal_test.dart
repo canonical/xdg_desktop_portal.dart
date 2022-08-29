@@ -320,6 +320,8 @@ class MockPortalDesktopObject extends DBusObject {
         return handleSecretMethodCall(methodCall);
       case 'org.freedesktop.portal.Settings':
         return handleSettingsMethodCall(methodCall);
+      case 'org.freedesktop.portal.Wallpaper':
+        return handleWallpaperMethodCall(methodCall);
       default:
         return DBusMethodErrorResponse.unknownInterface();
     }
@@ -676,6 +678,14 @@ class MockPortalDesktopObject extends DBusObject {
     }
   }
 
+  Future<DBusMethodResponse> handleWallpaperMethodCall(
+      DBusMethodCall methodCall) async {
+    switch (methodCall.name) {
+      default:
+        return DBusMethodErrorResponse.unknownMethod();
+    }
+  }
+
   @override
   Future<DBusMethodResponse> getProperty(String interface, String name) async {
     switch (interface) {
@@ -709,6 +719,8 @@ class MockPortalDesktopObject extends DBusObject {
         return getSecretProperty(name);
       case 'org.freedesktop.portal.Settings':
         return getSettingsProperty(name);
+      case 'org.freedesktop.portal.Wallpaper':
+        return getWallpaperProperty(name);
       default:
         return DBusMethodErrorResponse.unknownProperty();
     }
@@ -841,6 +853,15 @@ class MockPortalDesktopObject extends DBusObject {
   }
 
   Future<DBusMethodResponse> getSettingsProperty(String name) async {
+    switch (name) {
+      case 'version':
+        return DBusGetPropertyResponse(DBusUint32(1));
+      default:
+        return DBusMethodErrorResponse.unknownProperty();
+    }
+  }
+
+  Future<DBusMethodResponse> getWallpaperProperty(String name) async {
     switch (name) {
       case 'version':
         return DBusGetPropertyResponse(DBusUint32(1));
@@ -2736,5 +2757,27 @@ void main() {
             'age': DBusUint32(21)
           }
         }));
+  });
+
+  test('wallpaper', () async {
+    var server = DBusServer();
+    var clientAddress =
+        await server.listenAddress(DBusAddress.unix(dir: Directory.systemTemp));
+    addTearDown(() async {
+      await server.close();
+    });
+
+    var portalServer = MockPortalDesktopServer(clientAddress);
+    await portalServer.start();
+    addTearDown(() async {
+      await portalServer.close();
+    });
+
+    var client = XdgDesktopPortalClient(bus: DBusClient(clientAddress));
+    addTearDown(() async {
+      await client.close();
+    });
+
+    expect(await client.wallpaper.getVersion(), equals(1));
   });
 }
