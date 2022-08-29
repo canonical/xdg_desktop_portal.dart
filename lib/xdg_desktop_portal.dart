@@ -16,3 +16,4 @@ export 'src/xdg_remote_desktop_portal.dart';
 export 'src/xdg_screen_cast_portal.dart';
 export 'src/xdg_secret_portal.dart';
 export 'src/xdg_settings_portal.dart';
+export 'src/xdg_wallpaper_portal.dart';

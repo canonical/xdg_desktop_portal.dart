@@ -20,6 +20,7 @@ import 'xdg_remote_desktop_portal.dart';
 import 'xdg_screen_cast_portal.dart';
 import 'xdg_secret_portal.dart';
 import 'xdg_settings_portal.dart';
+import 'xdg_wallpaper_portal.dart';
 
 /// A client that connects to the portals.
 class XdgDesktopPortalClient {
@@ -81,6 +82,9 @@ class XdgDesktopPortalClient {
   /// Portal to access system settings.
   late final XdgSettingsPortal settings;
 
+  /// Portal for setting the desktop wallpaper.
+  late final XdgWallpaperPortal wallpaper;
+
   /// Keep track of used request/session tokens.
   final _usedTokens = <String>{};
 
@@ -111,6 +115,7 @@ class XdgDesktopPortalClient {
     screenCast = XdgScreenCastPortal(_desktopObject);
     secret = XdgSecretPortal(_desktopObject, _generateToken);
     settings = XdgSettingsPortal(_desktopObject);
+    wallpaper = XdgWallpaperPortal(_desktopObject);
   }
 
   /// Terminates all active connections. If a client remains unclosed, the Dart process may not terminate.
