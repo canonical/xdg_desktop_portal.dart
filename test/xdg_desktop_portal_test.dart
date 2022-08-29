@@ -310,6 +310,8 @@ class MockPortalDesktopObject extends DBusObject {
         return handleNotificationMethodCall(methodCall);
       case 'org.freedesktop.portal.OpenURI':
         return handleOpenURIMethodCall(methodCall);
+      case 'org.freedesktop.portal.PowerProfileMonitor':
+        return handlePowerProfileMonitorMethodCall(methodCall);
       case 'org.freedesktop.portal.Print':
         return handlePrintMethodCall(methodCall);
       case 'org.freedesktop.portal.ProxyResolver':
@@ -605,6 +607,14 @@ class MockPortalDesktopObject extends DBusObject {
     }
   }
 
+  Future<DBusMethodResponse> handlePowerProfileMonitorMethodCall(
+      DBusMethodCall methodCall) async {
+    switch (methodCall.name) {
+      default:
+        return DBusMethodErrorResponse.unknownMethod();
+    }
+  }
+
   Future<DBusMethodResponse> handlePrintMethodCall(
       DBusMethodCall methodCall) async {
     switch (methodCall.name) {
@@ -729,6 +739,8 @@ class MockPortalDesktopObject extends DBusObject {
         return getNotificationProperty(name);
       case 'org.freedesktop.portal.OpenURI':
         return getOpenURIProperty(name);
+      case 'org.freedesktop.portal.PowerProfileMonitor':
+        return getPowerProfileMonitorProperty(name);
       case 'org.freedesktop.portal.Print':
         return getPrintProperty(name);
       case 'org.freedesktop.portal.ProxyResolver':
@@ -835,6 +847,15 @@ class MockPortalDesktopObject extends DBusObject {
     switch (name) {
       case 'version':
         return DBusGetPropertyResponse(DBusUint32(3));
+      default:
+        return DBusMethodErrorResponse.unknownProperty();
+    }
+  }
+
+  Future<DBusMethodResponse> getPowerProfileMonitorProperty(String name) async {
+    switch (name) {
+      case 'version':
+        return DBusGetPropertyResponse(DBusUint32(1));
       default:
         return DBusMethodErrorResponse.unknownProperty();
     }
@@ -2634,6 +2655,28 @@ void main() {
             'activation_token': DBusString('token')
           })
         ]));
+  });
+
+  test('power profile monitor', () async {
+    var server = DBusServer();
+    var clientAddress =
+        await server.listenAddress(DBusAddress.unix(dir: Directory.systemTemp));
+    addTearDown(() async {
+      await server.close();
+    });
+
+    var portalServer = MockPortalDesktopServer(clientAddress);
+    await portalServer.start();
+    addTearDown(() async {
+      await portalServer.close();
+    });
+
+    var client = XdgDesktopPortalClient(bus: DBusClient(clientAddress));
+    addTearDown(() async {
+      await client.close();
+    });
+
+    expect(await client.powerProfileMonitor.getVersion(), equals(1));
   });
 
   test('print', () async {
