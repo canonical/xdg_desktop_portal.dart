@@ -1068,7 +1068,7 @@ class MockPortalDesktopServer extends DBusClient {
   final MockRequestResponse? saveFilesResponse;
   late final Map<String, Map<String, DBusValue>> notifications;
   final Map<String, List<String>> proxies;
-  final Map<String, Map<String, DBusValue>> settingsValues;
+  late final Map<String, Map<String, DBusValue>> settingsValues;
   final List<Map<String, DBusValue>> locations;
   final bool closeLocationSession;
   bool networkAvailable;
@@ -1098,7 +1098,7 @@ class MockPortalDesktopServer extends DBusClient {
     this.saveFilesResponse,
     Map<String, Map<String, DBusValue>>? notifications,
     this.proxies = const {},
-    this.settingsValues = const {},
+    Map<String, Map<String, DBusValue>>? settingsValues,
     this.locations = const [],
     this.closeLocationSession = false,
     this.networkAvailable = true,
@@ -1108,6 +1108,7 @@ class MockPortalDesktopServer extends DBusClient {
   }) : super(clientAddress) {
     _root = MockPortalDesktopObject(this);
     this.notifications = notifications ?? {};
+    this.settingsValues = settingsValues ?? {};
   }
 
   Future<void> start() async {
@@ -1127,6 +1128,15 @@ class MockPortalDesktopServer extends DBusClient {
       networkConnectivity = connectivity;
     }
     await _root.emitSignal('org.freedesktop.portal.NetworkMonitor', 'changed');
+  }
+
+  Future<void> setSetting(String namespace, String key, DBusValue value) async {
+    if (!settingsValues.containsKey(namespace)) {
+      settingsValues[namespace] = {};
+    }
+    settingsValues[namespace]![key] = value;
+    await _root.emitSignal('org.freedesktop.portal.Settings', 'SettingChanged',
+        [DBusString(namespace), DBusString(key), DBusVariant(value)]);
   }
 
   /// Generate a token for requests and sessions.
@@ -2864,6 +2874,47 @@ void main() {
             'age': DBusUint32(21)
           }
         }));
+  });
+
+  test('settings changed', () async {
+    var server = DBusServer();
+    var clientAddress =
+        await server.listenAddress(DBusAddress.unix(dir: Directory.systemTemp));
+    addTearDown(() async {
+      await server.close();
+    });
+
+    var portalServer = MockPortalDesktopServer(clientAddress, settingsValues: {
+      'com.example.test': {'name': DBusString('Foo')}
+    });
+    await portalServer.start();
+    addTearDown(() async {
+      await portalServer.close();
+    });
+
+    var client = XdgDesktopPortalClient(bus: DBusClient(clientAddress));
+    addTearDown(() async {
+      await client.close();
+    });
+
+    expect(
+        client.settings.settingChanged,
+        emitsInOrder([
+          XdgSettingChangeEvent(
+              'com.example.test', 'name', DBusString('Hello')),
+          XdgSettingChangeEvent(
+              'com.example.test', 'name', DBusString('World')),
+        ]));
+
+    // Read setting to ensure we are subscribed to changes.
+    expect(await client.settings.read('com.example.test', 'name'),
+        equals(DBusString('Foo')));
+
+    // Change value to trigeer events.
+    await portalServer.setSetting(
+        'com.example.test', 'name', DBusString('Hello'));
+    await portalServer.setSetting(
+        'com.example.test', 'name', DBusString('World'));
   });
 
   test('trash', () async {

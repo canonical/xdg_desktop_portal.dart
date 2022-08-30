@@ -1,10 +1,47 @@
 import 'package:dbus/dbus.dart';
 
+/// Details when a setting changes value.
+class XdgSettingChangeEvent {
+  /// The namespace of [key].
+  final String namespace;
+
+  /// The key that has changed.
+  final String key;
+
+  /// The new value for [key].
+  final DBusValue value;
+
+  const XdgSettingChangeEvent(this.namespace, this.key, this.value);
+
+  @override
+  int get hashCode => Object.hash(namespace, key, value);
+
+  @override
+  bool operator ==(other) =>
+      other is XdgSettingChangeEvent &&
+      other.namespace == namespace &&
+      other.key == key &&
+      other.value == value;
+
+  @override
+  String toString() => '$runtimeType($namespace, $key, $value)';
+}
+
 /// Portal to access system settings.
 class XdgSettingsPortal {
   final DBusRemoteObject _object;
 
   XdgSettingsPortal(this._object);
+
+  /// Stream of settings as they change.
+  Stream<XdgSettingChangeEvent> get settingChanged =>
+      DBusRemoteObjectSignalStream(
+              object: _object,
+              interface: 'org.freedesktop.portal.Settings',
+              name: 'SettingChanged',
+              signature: DBusSignature(('ssv')))
+          .map((signal) => XdgSettingChangeEvent(signal.values[0].asString(),
+              signal.values[1].asString(), signal.values[2].asVariant()));
 
   /// Get the version of this portal.
   Future<int> getVersion() => _object
