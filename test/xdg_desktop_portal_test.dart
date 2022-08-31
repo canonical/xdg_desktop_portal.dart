@@ -1989,8 +1989,7 @@ void main() {
       await portalServer.close();
     });
 
-    var busClient = DBusClient(clientAddress);
-    var client = XdgDesktopPortalClient(bus: busClient);
+    var client = XdgDesktopPortalClient(bus: DBusClient(clientAddress));
     addTearDown(() async {
       await client.close();
     });
@@ -1999,7 +1998,7 @@ void main() {
     var subscription = stream.listen(expectAsync1((result) {}, count: 0));
 
     // Ensure that the session has been created and then check for it.
-    await busClient.ping();
+    await client.fileChooser.getVersion();
     expect(portalServer.openFileDialogs, hasLength(1));
 
     // Ensure the dialog is removed when the request is cancelled.
