@@ -703,6 +703,13 @@ class MockPortalDesktopObject extends DBusObject {
   Future<DBusMethodResponse> handleTrashMethodCall(
       DBusMethodCall methodCall) async {
     switch (methodCall.name) {
+      case 'TrashFile':
+        var handle = methodCall.values[0].asUnixFd();
+        var file = handle.toFile();
+        var contents = utf8.decode(await file.read(1024));
+        server.trashedFiles.add(contents);
+        var result = server.trashFileResults[contents] ?? 1;
+        return DBusMethodSuccessResponse([DBusUint32(result)]);
       default:
         return DBusMethodErrorResponse.unknownMethod();
     }
@@ -1075,6 +1082,8 @@ class MockPortalDesktopServer extends DBusClient {
   bool networkMetered;
   int networkConnectivity;
   List<int> secret;
+  final trashedFiles = <String>[];
+  final Map<String, int> trashFileResults;
 
   final accountDialogs = <MockAccountDialog>[];
   final background = <MockBackground>[];
@@ -1088,24 +1097,24 @@ class MockPortalDesktopServer extends DBusClient {
       _locationSessions.values;
   final _locationSessions = <DBusObjectPath, MockLocationSession>{};
 
-  MockPortalDesktopServer(
-    DBusAddress clientAddress, {
-    this.userId,
-    this.userName,
-    this.userImage,
-    this.openFileResponse,
-    this.saveFileResponse,
-    this.saveFilesResponse,
-    Map<String, Map<String, DBusValue>>? notifications,
-    this.proxies = const {},
-    Map<String, Map<String, DBusValue>>? settingsValues,
-    this.locations = const [],
-    this.closeLocationSession = false,
-    this.networkAvailable = true,
-    this.networkMetered = false,
-    this.networkConnectivity = 3,
-    this.secret = const [],
-  }) : super(clientAddress) {
+  MockPortalDesktopServer(DBusAddress clientAddress,
+      {this.userId,
+      this.userName,
+      this.userImage,
+      this.openFileResponse,
+      this.saveFileResponse,
+      this.saveFilesResponse,
+      Map<String, Map<String, DBusValue>>? notifications,
+      this.proxies = const {},
+      Map<String, Map<String, DBusValue>>? settingsValues,
+      this.locations = const [],
+      this.closeLocationSession = false,
+      this.networkAvailable = true,
+      this.networkMetered = false,
+      this.networkConnectivity = 3,
+      this.secret = const [],
+      this.trashFileResults = const {}})
+      : super(clientAddress) {
     _root = MockPortalDesktopObject(this);
     this.notifications = notifications ?? {};
     this.settingsValues = settingsValues ?? {};
@@ -2925,7 +2934,8 @@ void main() {
       await server.close();
     });
 
-    var portalServer = MockPortalDesktopServer(clientAddress);
+    var portalServer =
+        MockPortalDesktopServer(clientAddress, trashFileResults: {'ERROR': 0});
     await portalServer.start();
     addTearDown(() async {
       await portalServer.close();
@@ -2936,7 +2946,24 @@ void main() {
       await client.close();
     });
 
+    var dir = await Directory.systemTemp.createTemp('xdg-portal-dart');
+    addTearDown(() async {
+      await dir.delete(recursive: true);
+    });
+
+    var path = '${dir.path}/file-to-trash';
+    await File(path).writeAsString('DELETE ME');
+
+    var errorPath = '${dir.path}/file-fail-trash';
+    await File(errorPath).writeAsString('ERROR');
+
     expect(await client.trash.getVersion(), equals(1));
+
+    await client.trash.trashFile(File(path));
+    expect(portalServer.trashedFiles, equals(['DELETE ME']));
+
+    expect(() => client.trash.trashFile(File(errorPath)),
+        throwsA(isA<XdgTrashFileException>()));
   });
 
   test('wallpaper', () async {
