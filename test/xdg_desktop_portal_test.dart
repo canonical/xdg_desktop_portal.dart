@@ -327,20 +327,32 @@ class MockPortalDesktopObject extends DBusObject {
         return handleFileChooserMethodCall(methodCall);
       case 'org.freedesktop.portal.Location':
         return handleLocationMethodCall(methodCall);
+      case 'org.freedesktop.portal.MemoryMonitor':
+        return handleMemoryMonitorMethodCall(methodCall);
       case 'org.freedesktop.portal.NetworkMonitor':
         return handleNetworkMonitorMethodCall(methodCall);
       case 'org.freedesktop.portal.Notification':
         return handleNotificationMethodCall(methodCall);
       case 'org.freedesktop.portal.OpenURI':
         return handleOpenURIMethodCall(methodCall);
+      case 'org.freedesktop.portal.PowerProfileMonitor':
+        return handlePowerProfileMonitorMethodCall(methodCall);
+      case 'org.freedesktop.portal.Print':
+        return handlePrintMethodCall(methodCall);
       case 'org.freedesktop.portal.ProxyResolver':
         return handleProxyResolverMethodCall(methodCall);
       case 'org.freedesktop.portal.RemoteDesktop':
         return handleRemoteDesktopMethodCall(methodCall);
+      case 'org.freedesktop.portal.ScreenCast':
+        return handleScreenCastMethodCall(methodCall);
       case 'org.freedesktop.portal.Secret':
         return handleSecretMethodCall(methodCall);
       case 'org.freedesktop.portal.Settings':
         return handleSettingsMethodCall(methodCall);
+      case 'org.freedesktop.portal.Trash':
+        return handleTrashMethodCall(methodCall);
+      case 'org.freedesktop.portal.Wallpaper':
+        return handleWallpaperMethodCall(methodCall);
       default:
         return DBusMethodErrorResponse.unknownInterface();
     }
@@ -554,6 +566,14 @@ class MockPortalDesktopObject extends DBusObject {
     }
   }
 
+  Future<DBusMethodResponse> handleMemoryMonitorMethodCall(
+      DBusMethodCall methodCall) async {
+    switch (methodCall.name) {
+      default:
+        return DBusMethodErrorResponse.unknownMethod();
+    }
+  }
+
   Future<DBusMethodResponse> handleNetworkMonitorMethodCall(
       DBusMethodCall methodCall) async {
     switch (methodCall.name) {
@@ -607,6 +627,22 @@ class MockPortalDesktopObject extends DBusObject {
         var request = await server.addRequest(methodCall.sender, token);
         Future.delayed(Duration.zero, () async => await request.respond());
         return DBusMethodSuccessResponse([request.path]);
+      default:
+        return DBusMethodErrorResponse.unknownMethod();
+    }
+  }
+
+  Future<DBusMethodResponse> handlePowerProfileMonitorMethodCall(
+      DBusMethodCall methodCall) async {
+    switch (methodCall.name) {
+      default:
+        return DBusMethodErrorResponse.unknownMethod();
+    }
+  }
+
+  Future<DBusMethodResponse> handlePrintMethodCall(
+      DBusMethodCall methodCall) async {
+    switch (methodCall.name) {
       default:
         return DBusMethodErrorResponse.unknownMethod();
     }
@@ -784,6 +820,14 @@ class MockPortalDesktopObject extends DBusObject {
     }
   }
 
+  Future<DBusMethodResponse> handleScreenCastMethodCall(
+      DBusMethodCall methodCall) async {
+    switch (methodCall.name) {
+      default:
+        return DBusMethodErrorResponse.unknownMethod();
+    }
+  }
+
   Future<DBusMethodResponse> handleSecretMethodCall(
       DBusMethodCall methodCall) async {
     switch (methodCall.name) {
@@ -833,6 +877,29 @@ class MockPortalDesktopObject extends DBusObject {
     }
   }
 
+  Future<DBusMethodResponse> handleTrashMethodCall(
+      DBusMethodCall methodCall) async {
+    switch (methodCall.name) {
+      case 'TrashFile':
+        var handle = methodCall.values[0].asUnixFd();
+        var file = handle.toFile();
+        var contents = utf8.decode(await file.read(1024));
+        server.trashedFiles.add(contents);
+        var result = server.trashFileResults[contents] ?? 1;
+        return DBusMethodSuccessResponse([DBusUint32(result)]);
+      default:
+        return DBusMethodErrorResponse.unknownMethod();
+    }
+  }
+
+  Future<DBusMethodResponse> handleWallpaperMethodCall(
+      DBusMethodCall methodCall) async {
+    switch (methodCall.name) {
+      default:
+        return DBusMethodErrorResponse.unknownMethod();
+    }
+  }
+
   @override
   Future<DBusMethodResponse> getProperty(String interface, String name) async {
     switch (interface) {
@@ -848,20 +915,32 @@ class MockPortalDesktopObject extends DBusObject {
         return getFileChooserProperty(name);
       case 'org.freedesktop.portal.Location':
         return getLocationProperty(name);
+      case 'org.freedesktop.portal.MemoryMonitor':
+        return getMemoryMonitorProperty(name);
       case 'org.freedesktop.portal.NetworkMonitor':
         return getNetworkMonitorProperty(name);
       case 'org.freedesktop.portal.Notification':
         return getNotificationProperty(name);
       case 'org.freedesktop.portal.OpenURI':
         return getOpenURIProperty(name);
+      case 'org.freedesktop.portal.PowerProfileMonitor':
+        return getPowerProfileMonitorProperty(name);
+      case 'org.freedesktop.portal.Print':
+        return getPrintProperty(name);
       case 'org.freedesktop.portal.ProxyResolver':
         return getProxyResolverProperty(name);
       case 'org.freedesktop.portal.RemoteDesktop':
         return getRemoteDesktopProperty(name);
+      case 'org.freedesktop.portal.ScreenCast':
+        return getScreenCastProperty(name);
       case 'org.freedesktop.portal.Secret':
         return getSecretProperty(name);
       case 'org.freedesktop.portal.Settings':
         return getSettingsProperty(name);
+      case 'org.freedesktop.portal.Trash':
+        return getTrashProperty(name);
+      case 'org.freedesktop.portal.Wallpaper':
+        return getWallpaperProperty(name);
       default:
         return DBusMethodErrorResponse.unknownProperty();
     }
@@ -921,6 +1000,15 @@ class MockPortalDesktopObject extends DBusObject {
     }
   }
 
+  Future<DBusMethodResponse> getMemoryMonitorProperty(String name) async {
+    switch (name) {
+      case 'version':
+        return DBusGetPropertyResponse(DBusUint32(1));
+      default:
+        return DBusMethodErrorResponse.unknownProperty();
+    }
+  }
+
   Future<DBusMethodResponse> getNetworkMonitorProperty(String name) async {
     switch (name) {
       case 'version':
@@ -948,6 +1036,24 @@ class MockPortalDesktopObject extends DBusObject {
     }
   }
 
+  Future<DBusMethodResponse> getPowerProfileMonitorProperty(String name) async {
+    switch (name) {
+      case 'version':
+        return DBusGetPropertyResponse(DBusUint32(1));
+      default:
+        return DBusMethodErrorResponse.unknownProperty();
+    }
+  }
+
+  Future<DBusMethodResponse> getPrintProperty(String name) async {
+    switch (name) {
+      case 'version':
+        return DBusGetPropertyResponse(DBusUint32(1));
+      default:
+        return DBusMethodErrorResponse.unknownProperty();
+    }
+  }
+
   Future<DBusMethodResponse> getProxyResolverProperty(String name) async {
     switch (name) {
       case 'version':
@@ -963,6 +1069,15 @@ class MockPortalDesktopObject extends DBusObject {
         return DBusGetPropertyResponse(DBusUint32(1));
       case 'AvailableDeviceTypes':
         return DBusGetPropertyResponse(DBusUint32(7));
+      default:
+        return DBusMethodErrorResponse.unknownProperty();
+    }
+  }
+
+  Future<DBusMethodResponse> getScreenCastProperty(String name) async {
+    switch (name) {
+      case 'version':
+        return DBusGetPropertyResponse(DBusUint32(4));
       default:
         return DBusMethodErrorResponse.unknownProperty();
     }
@@ -985,6 +1100,24 @@ class MockPortalDesktopObject extends DBusObject {
         return DBusMethodErrorResponse.unknownProperty();
     }
   }
+
+  Future<DBusMethodResponse> getTrashProperty(String name) async {
+    switch (name) {
+      case 'version':
+        return DBusGetPropertyResponse(DBusUint32(1));
+      default:
+        return DBusMethodErrorResponse.unknownProperty();
+    }
+  }
+
+  Future<DBusMethodResponse> getWallpaperProperty(String name) async {
+    switch (name) {
+      case 'version':
+        return DBusGetPropertyResponse(DBusUint32(1));
+      default:
+        return DBusMethodErrorResponse.unknownProperty();
+    }
+  }
 }
 
 class MockPortalDocumentsObject extends DBusObject {
@@ -998,6 +1131,8 @@ class MockPortalDocumentsObject extends DBusObject {
     switch (methodCall.interface) {
       case 'org.freedesktop.portal.Documents':
         return handleDocumentsMethodCall(methodCall);
+      case 'org.freedesktop.portal.FileTransfer':
+        return handleFileTransferMethodCall(methodCall);
       default:
         return DBusMethodErrorResponse.unknownInterface();
     }
@@ -1058,11 +1193,21 @@ class MockPortalDocumentsObject extends DBusObject {
     }
   }
 
+  Future<DBusMethodResponse> handleFileTransferMethodCall(
+      DBusMethodCall methodCall) async {
+    switch (methodCall.name) {
+      default:
+        return DBusMethodErrorResponse.unknownMethod();
+    }
+  }
+
   @override
   Future<DBusMethodResponse> getProperty(String interface, String name) async {
     switch (interface) {
       case 'org.freedesktop.portal.Documents':
         return getDocumentsProperty(name);
+      case 'org.freedesktop.portal.FileTransfer':
+        return getFileTransferProperty(name);
       default:
         return DBusMethodErrorResponse.unknownProperty();
     }
@@ -1072,6 +1217,15 @@ class MockPortalDocumentsObject extends DBusObject {
     switch (name) {
       case 'version':
         return DBusGetPropertyResponse(DBusUint32(4));
+      default:
+        return DBusMethodErrorResponse.unknownProperty();
+    }
+  }
+
+  Future<DBusMethodResponse> getFileTransferProperty(String name) async {
+    switch (name) {
+      case 'version':
+        return DBusGetPropertyResponse(DBusUint32(1));
       default:
         return DBusMethodErrorResponse.unknownProperty();
     }
@@ -1100,13 +1254,15 @@ class MockPortalDesktopServer extends DBusClient {
   final MockRequestResponse? saveFilesResponse;
   late final Map<String, Map<String, DBusValue>> notifications;
   final Map<String, List<String>> proxies;
-  final Map<String, Map<String, DBusValue>> settingsValues;
+  late final Map<String, Map<String, DBusValue>> settingsValues;
   final List<Map<String, DBusValue>> locations;
   final bool closeLocationSession;
   bool networkAvailable;
   bool networkMetered;
   int networkConnectivity;
   List<int> secret;
+  final trashedFiles = <String>[];
+  final Map<String, int> trashFileResults;
   final String? remoteDesktopSessionHandle;
   late final int? remoteDesktopSelectedDivice;
 
@@ -1123,27 +1279,28 @@ class MockPortalDesktopServer extends DBusClient {
   final _locationSessions = <DBusObjectPath, MockLocationSession>{};
   final remoteDesktop = <MockRemoteDesktop>[];
 
-  MockPortalDesktopServer(
-    DBusAddress clientAddress, {
-    this.userId,
-    this.userName,
-    this.userImage,
-    this.openFileResponse,
-    this.saveFileResponse,
-    this.saveFilesResponse,
-    Map<String, Map<String, DBusValue>>? notifications,
-    this.proxies = const {},
-    this.settingsValues = const {},
-    this.locations = const [],
-    this.closeLocationSession = false,
-    this.networkAvailable = true,
-    this.networkMetered = false,
-    this.networkConnectivity = 3,
-    this.remoteDesktopSessionHandle,
-    this.secret = const [],
-  }) : super(clientAddress) {
+  MockPortalDesktopServer(DBusAddress clientAddress,
+      {this.userId,
+      this.userName,
+      this.userImage,
+      this.openFileResponse,
+      this.saveFileResponse,
+      this.saveFilesResponse,
+      Map<String, Map<String, DBusValue>>? notifications,
+      this.proxies = const {},
+      Map<String, Map<String, DBusValue>>? settingsValues,
+      this.locations = const [],
+      this.closeLocationSession = false,
+      this.networkAvailable = true,
+      this.networkMetered = false,
+      this.networkConnectivity = 3,
+      this.remoteDesktopSessionHandle,
+      this.secret = const [],
+      this.trashFileResults = const {}})
+      : super(clientAddress) {
     _root = MockPortalDesktopObject(this);
     this.notifications = notifications ?? {};
+    this.settingsValues = settingsValues ?? {};
   }
 
   Future<void> start() async {
@@ -1163,6 +1320,15 @@ class MockPortalDesktopServer extends DBusClient {
       networkConnectivity = connectivity;
     }
     await _root.emitSignal('org.freedesktop.portal.NetworkMonitor', 'changed');
+  }
+
+  Future<void> setSetting(String namespace, String key, DBusValue value) async {
+    if (!settingsValues.containsKey(namespace)) {
+      settingsValues[namespace] = {};
+    }
+    settingsValues[namespace]![key] = value;
+    await _root.emitSignal('org.freedesktop.portal.Settings', 'SettingChanged',
+        [DBusString(namespace), DBusString(key), DBusVariant(value)]);
   }
 
   /// Generate a token for requests and sessions.
@@ -2006,8 +2172,7 @@ void main() {
       await portalServer.close();
     });
 
-    var busClient = DBusClient(clientAddress);
-    var client = XdgDesktopPortalClient(bus: busClient);
+    var client = XdgDesktopPortalClient(bus: DBusClient(clientAddress));
     addTearDown(() async {
       await client.close();
     });
@@ -2016,7 +2181,7 @@ void main() {
     var subscription = stream.listen(expectAsync1((result) {}, count: 0));
 
     // Ensure that the session has been created and then check for it.
-    await busClient.ping();
+    await client.fileChooser.getVersion();
     expect(portalServer.openFileDialogs, hasLength(1));
 
     // Ensure the dialog is removed when the request is cancelled.
@@ -2107,6 +2272,28 @@ void main() {
 
     var stream = client.fileChooser.openFile(title: 'Open File');
     expect(() => stream.first, throwsA(isA<XdgPortalRequestFailedException>()));
+  });
+
+  test('file transfer', () async {
+    var server = DBusServer();
+    var clientAddress =
+        await server.listenAddress(DBusAddress.unix(dir: Directory.systemTemp));
+    addTearDown(() async {
+      await server.close();
+    });
+
+    var portalServer = MockPortalDocumentsServer(clientAddress);
+    await portalServer.start();
+    addTearDown(() async {
+      await portalServer.close();
+    });
+
+    var client = XdgDesktopPortalClient(bus: DBusClient(clientAddress));
+    addTearDown(() async {
+      await client.close();
+    });
+
+    expect(await client.fileTransfer.getVersion(), equals(1));
   });
 
   test('location', () async {
@@ -2303,6 +2490,28 @@ void main() {
               timestamp: DateTime.fromMicrosecondsSinceEpoch(1658718569000000)),
           emitsDone
         ]));
+  });
+
+  test('memory monitor', () async {
+    var server = DBusServer();
+    var clientAddress =
+        await server.listenAddress(DBusAddress.unix(dir: Directory.systemTemp));
+    addTearDown(() async {
+      await server.close();
+    });
+
+    var portalServer = MockPortalDesktopServer(clientAddress);
+    await portalServer.start();
+    addTearDown(() async {
+      await portalServer.close();
+    });
+
+    var client = XdgDesktopPortalClient(bus: DBusClient(clientAddress));
+    addTearDown(() async {
+      await client.close();
+    });
+
+    expect(await client.memoryMonitor.getVersion(), equals(1));
   });
 
   test('network monitor - status', () async {
@@ -2649,6 +2858,50 @@ void main() {
         ]));
   });
 
+  test('power profile monitor', () async {
+    var server = DBusServer();
+    var clientAddress =
+        await server.listenAddress(DBusAddress.unix(dir: Directory.systemTemp));
+    addTearDown(() async {
+      await server.close();
+    });
+
+    var portalServer = MockPortalDesktopServer(clientAddress);
+    await portalServer.start();
+    addTearDown(() async {
+      await portalServer.close();
+    });
+
+    var client = XdgDesktopPortalClient(bus: DBusClient(clientAddress));
+    addTearDown(() async {
+      await client.close();
+    });
+
+    expect(await client.powerProfileMonitor.getVersion(), equals(1));
+  });
+
+  test('print', () async {
+    var server = DBusServer();
+    var clientAddress =
+        await server.listenAddress(DBusAddress.unix(dir: Directory.systemTemp));
+    addTearDown(() async {
+      await server.close();
+    });
+
+    var portalServer = MockPortalDesktopServer(clientAddress);
+    await portalServer.start();
+    addTearDown(() async {
+      await portalServer.close();
+    });
+
+    var client = XdgDesktopPortalClient(bus: DBusClient(clientAddress));
+    addTearDown(() async {
+      await client.close();
+    });
+
+    expect(await client.print.getVersion(), equals(1));
+  });
+
   test('remote desktop', () async {
     var server = DBusServer();
     var clientAddress =
@@ -2840,6 +3093,28 @@ void main() {
         equals(['http://localhost:1234']));
   });
 
+  test('screen cast', () async {
+    var server = DBusServer();
+    var clientAddress =
+        await server.listenAddress(DBusAddress.unix(dir: Directory.systemTemp));
+    addTearDown(() async {
+      await server.close();
+    });
+
+    var portalServer = MockPortalDesktopServer(clientAddress);
+    await portalServer.start();
+    addTearDown(() async {
+      await portalServer.close();
+    });
+
+    var client = XdgDesktopPortalClient(bus: DBusClient(clientAddress));
+    addTearDown(() async {
+      await client.close();
+    });
+
+    expect(await client.screenCast.getVersion(), equals(4));
+  });
+
   test('secret', () async {
     var server = DBusServer();
     var clientAddress =
@@ -2932,5 +3207,108 @@ void main() {
             'age': DBusUint32(21)
           }
         }));
+  });
+
+  test('settings changed', () async {
+    var server = DBusServer();
+    var clientAddress =
+        await server.listenAddress(DBusAddress.unix(dir: Directory.systemTemp));
+    addTearDown(() async {
+      await server.close();
+    });
+
+    var portalServer = MockPortalDesktopServer(clientAddress, settingsValues: {
+      'com.example.test': {'name': DBusString('Foo')}
+    });
+    await portalServer.start();
+    addTearDown(() async {
+      await portalServer.close();
+    });
+
+    var client = XdgDesktopPortalClient(bus: DBusClient(clientAddress));
+    addTearDown(() async {
+      await client.close();
+    });
+
+    expect(
+        client.settings.settingChanged,
+        emitsInOrder([
+          XdgSettingChangeEvent(
+              'com.example.test', 'name', DBusString('Hello')),
+          XdgSettingChangeEvent(
+              'com.example.test', 'name', DBusString('World')),
+        ]));
+
+    // Read setting to ensure we are subscribed to changes.
+    expect(await client.settings.read('com.example.test', 'name'),
+        equals(DBusString('Foo')));
+
+    // Change value to trigeer events.
+    await portalServer.setSetting(
+        'com.example.test', 'name', DBusString('Hello'));
+    await portalServer.setSetting(
+        'com.example.test', 'name', DBusString('World'));
+  });
+
+  test('trash', () async {
+    var server = DBusServer();
+    var clientAddress =
+        await server.listenAddress(DBusAddress.unix(dir: Directory.systemTemp));
+    addTearDown(() async {
+      await server.close();
+    });
+
+    var portalServer =
+        MockPortalDesktopServer(clientAddress, trashFileResults: {'ERROR': 0});
+    await portalServer.start();
+    addTearDown(() async {
+      await portalServer.close();
+    });
+
+    var client = XdgDesktopPortalClient(bus: DBusClient(clientAddress));
+    addTearDown(() async {
+      await client.close();
+    });
+
+    var dir = await Directory.systemTemp.createTemp('xdg-portal-dart');
+    addTearDown(() async {
+      await dir.delete(recursive: true);
+    });
+
+    var path = '${dir.path}/file-to-trash';
+    await File(path).writeAsString('DELETE ME');
+
+    var errorPath = '${dir.path}/file-fail-trash';
+    await File(errorPath).writeAsString('ERROR');
+
+    expect(await client.trash.getVersion(), equals(1));
+
+    await client.trash.trashFile(File(path));
+    expect(portalServer.trashedFiles, equals(['DELETE ME']));
+
+    expect(() => client.trash.trashFile(File(errorPath)),
+        throwsA(isA<XdgTrashFileException>()));
+  });
+
+  test('wallpaper', () async {
+    var server = DBusServer();
+    var clientAddress =
+        await server.listenAddress(DBusAddress.unix(dir: Directory.systemTemp));
+    addTearDown(() async {
+      await server.close();
+    });
+
+    var portalServer = MockPortalDesktopServer(clientAddress);
+    await portalServer.start();
+    addTearDown(() async {
+      await portalServer.close();
+    });
+
+    var client = XdgDesktopPortalClient(bus: DBusClient(clientAddress));
+    addTearDown(() async {
+      await client.close();
+    });
+
+    expect(await client.wallpaper.getVersion(), equals(1));
   });
 }

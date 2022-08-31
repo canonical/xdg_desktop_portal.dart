@@ -9,14 +9,21 @@ import 'xdg_camera_portal.dart';
 import 'xdg_documents_portal.dart';
 import 'xdg_email_portal.dart';
 import 'xdg_file_chooser_portal.dart';
+import 'xdg_file_transfer_portal.dart';
+import 'xdg_memory_monitor_portal.dart';
 import 'xdg_network_monitor_portal.dart';
 import 'xdg_notification_portal.dart';
 import 'xdg_location_portal.dart';
 import 'xdg_open_uri_portal.dart';
+import 'xdg_power_profile_monitor_portal.dart';
+import 'xdg_print_portal.dart';
 import 'xdg_proxy_resolver_portal.dart';
 import 'xdg_remote_desktop_portal.dart';
+import 'xdg_screen_cast_portal.dart';
 import 'xdg_secret_portal.dart';
 import 'xdg_settings_portal.dart';
+import 'xdg_trash_portal.dart';
+import 'xdg_wallpaper_portal.dart';
 
 /// A client that connects to the portals.
 class XdgDesktopPortalClient {
@@ -48,6 +55,9 @@ class XdgDesktopPortalClient {
   /// Portal to get location information.
   late final XdgLocationPortal location;
 
+  /// Portal to monitor memory.
+  late final XdgMemoryMonitorPortal memoryMonitor;
+
   /// Portal to monitor networking.
   late final XdgNetworkMonitorPortal networkMonitor;
 
@@ -57,17 +67,35 @@ class XdgDesktopPortalClient {
   /// Portal to open URIs.
   late final XdgOpenUriPortal openUri;
 
+  /// Portal to transfer files between applications.
+  late final XdgFileTransferPortal fileTransfer;
+
+  /// Portal for power profile monitoring.
+  late final XdgPowerProfileMonitorPortal powerProfileMonitor;
+
+  /// Portal for printing.
+  late final XdgPrintPortal print;
+
   /// Portal to use system proxy.
   late final XdgProxyResolverPortal proxyResolver;
 
   /// Portal to use remote desktop.
   late final XdgRemoteDesktopPortal remoteDesktop;
 
+  /// Portal to perform screen casts.
+  late final XdgScreenCastPortal screenCast;
+
   /// Portal for retrieving application secret.
   late final XdgSecretPortal secret;
 
   /// Portal to access system settings.
   late final XdgSettingsPortal settings;
+
+  /// Portal for trashing files.
+  late final XdgTrashPortal trash;
+
+  /// Portal for setting the desktop wallpaper.
+  late final XdgWallpaperPortal wallpaper;
 
   /// Keep track of used request/session tokens.
   final _usedTokens = <String>{};
@@ -88,14 +116,21 @@ class XdgDesktopPortalClient {
     documents = XdgDocumentsPortal(_documentsObject);
     email = XdgEmailPortal(_desktopObject, _generateToken);
     fileChooser = XdgFileChooserPortal(_desktopObject, _generateToken);
+    fileTransfer = XdgFileTransferPortal(_documentsObject);
     location = XdgLocationPortal(_desktopObject, _generateToken);
+    memoryMonitor = XdgMemoryMonitorPortal(_desktopObject);
     networkMonitor = XdgNetworkMonitorPortal(_desktopObject);
     notification = XdgNotificationPortal(_desktopObject);
     openUri = XdgOpenUriPortal(_desktopObject, _generateToken);
+    powerProfileMonitor = XdgPowerProfileMonitorPortal(_desktopObject);
+    print = XdgPrintPortal(_desktopObject);
     proxyResolver = XdgProxyResolverPortal(_desktopObject);
     remoteDesktop = XdgRemoteDesktopPortal(_desktopObject, _generateToken);
+    screenCast = XdgScreenCastPortal(_desktopObject);
     secret = XdgSecretPortal(_desktopObject, _generateToken);
     settings = XdgSettingsPortal(_desktopObject);
+    trash = XdgTrashPortal(_desktopObject);
+    wallpaper = XdgWallpaperPortal(_desktopObject);
   }
 
   /// Terminates all active connections. If a client remains unclosed, the Dart process may not terminate.

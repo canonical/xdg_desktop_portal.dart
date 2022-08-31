@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.12
+
+* Add XdgSettingsPortal.settingChanged stream.
+* Add some stub portals that just get the portal version for now.
+
 ## 0.1.11
 
 * Add Secret, Documents portals.

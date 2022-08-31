@@ -17,7 +17,7 @@ enum XdgRemoteDesktopKeyboardKeyState { released, pressed }
 /// The state of the remote desktop keyboard keysym.
 enum XdgRemoteDesktopKeyboardKeysymState { released, pressed }
 
-/// Remote desktop portal.
+/// Portal to use remote desktop.
 class XdgRemoteDesktopPortal {
   final DBusRemoteObject _object;
   final String Function() _generateToken;
@@ -27,7 +27,7 @@ class XdgRemoteDesktopPortal {
 
   /// Get the version of this portal.
   Future<int> getVersion() => _object
-      .getProperty('org.freedesktop.portal.Secret', 'version',
+      .getProperty('org.freedesktop.portal.RemoteDesktop', 'version',
           signature: DBusSignature('u'))
       .then((v) => v.asUint32());
 
