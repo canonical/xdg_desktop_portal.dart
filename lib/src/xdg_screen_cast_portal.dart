@@ -33,9 +33,16 @@ class ScreenCastStream {
   /// Opaque identifier.
   final String id;
 
+  /// The position of x in the compositor coordinate space.
   final int x;
+
+  /// The position of y in the compositor coordinate space.
   final int y;
+
+  /// The width represents the width of the stream as it is displayed in the compositor coordinate space.
   final int width;
+
+  /// The height represents the height of the stream as it is displayed in the compositor coordinate space.
   final int height;
 
   /// The type of the content which is being screen casted.
@@ -72,7 +79,7 @@ class ScreenCastStream {
       '$runtimeType(node ID: $nodeId, id: $id, position: ($x, $y), size: ($width, $height), sourceType: $sourceType})';
 }
 
-/// Screen cast portal.
+/// Portal to perform screen casts.
 class XdgScreenCastPortal {
   final DBusRemoteObject _object;
   final String Function() _generateToken;
@@ -88,19 +95,17 @@ class XdgScreenCastPortal {
       .then((v) => v.asUint32());
 
   /// Get the available screen cast source types.
-  Future<Set<ScreenCastAvailableSourceType>> getAvailableSourceTypes() =>
-      _object
-          .getProperty(
-              'org.freedesktop.portal.ScreenCast', 'AvailableSourceTypes',
-              signature: DBusSignature('u'))
-          .then((v) {
-        final value = v.asUint32();
-        final types = <ScreenCastAvailableSourceType>{};
-        if (value & 1 != 0) types.add(ScreenCastAvailableSourceType.monitor);
-        if (value & 2 != 0) types.add(ScreenCastAvailableSourceType.window);
-        if (value & 4 != 0) types.add(ScreenCastAvailableSourceType.virtual);
-        return types;
-      });
+  Future<Set<ScreenCastAvailableSourceType>> getAvailableSourceTypes() async {
+    final result = await _object.getProperty(
+        'org.freedesktop.portal.ScreenCast', 'AvailableSourceTypes',
+        signature: DBusSignature('u'));
+    final value = result.asUint32();
+    final types = <ScreenCastAvailableSourceType>{};
+    if (value & 1 != 0) types.add(ScreenCastAvailableSourceType.monitor);
+    if (value & 2 != 0) types.add(ScreenCastAvailableSourceType.window);
+    if (value & 4 != 0) types.add(ScreenCastAvailableSourceType.virtual);
+    return types;
+  }
 
   /// Get the available screen cast cursor modes.
   Future<Set<ScreenCastAvailableCursorMode>> getAvailableCursorModes() =>

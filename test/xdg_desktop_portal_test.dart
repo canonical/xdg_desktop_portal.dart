@@ -82,6 +82,39 @@ class MockCamera {
   String toString() => '$runtimeType($options)';
 }
 
+class MockDocument {
+  final Uint8List path;
+  int flags;
+  late final Map<String, Set<String>> permissions;
+
+  MockDocument(this.path,
+      {this.flags = 0, Map<String, Set<String>>? permissions}) {
+    this.permissions = permissions ?? {};
+  }
+
+  @override
+  int get hashCode => Object.hash(
+      Object.hashAll(path),
+      flags,
+      Object.hashAll(permissions.entries.map(
+          (entry) => Object.hash(entry.key, Object.hashAll(entry.value)))));
+
+  @override
+  bool operator ==(other) {
+    if (identical(this, other)) return true;
+    final deepEquals = const DeepCollectionEquality().equals;
+
+    return other is MockDocument &&
+        deepEquals(other.path, path) &&
+        other.flags == flags &&
+        deepEquals(other.permissions, permissions);
+  }
+
+  @override
+  String toString() =>
+      '$runtimeType($path, flags: $flags, permissions: $permissions)';
+}
+
 class MockEmail {
   final String parentWindow;
   final Map<String, DBusValue> options;
@@ -214,7 +247,7 @@ class MockScreenCast {
 }
 
 class MockPortalRequestObject extends DBusObject {
-  final MockPortalServer server;
+  final MockPortalDesktopServer server;
   Future<void> Function()? onClosed;
 
   MockPortalRequestObject(
@@ -248,7 +281,7 @@ class MockPortalRequestObject extends DBusObject {
 }
 
 class MockPortalSessionObject extends DBusObject {
-  final MockPortalServer server;
+  final MockPortalDesktopServer server;
 
   MockPortalSessionObject(this.server, String token)
       : super(DBusObjectPath('/org/freedesktop/portal/desktop/session/$token'));
@@ -269,10 +302,10 @@ class MockPortalSessionObject extends DBusObject {
   }
 }
 
-class MockPortalObject extends DBusObject {
-  final MockPortalServer server;
+class MockPortalDesktopObject extends DBusObject {
+  final MockPortalDesktopServer server;
 
-  MockPortalObject(this.server)
+  MockPortalDesktopObject(this.server)
       : super(DBusObjectPath('/org/freedesktop/portal/desktop'));
 
   @override
@@ -290,20 +323,32 @@ class MockPortalObject extends DBusObject {
         return handleFileChooserMethodCall(methodCall);
       case 'org.freedesktop.portal.Location':
         return handleLocationMethodCall(methodCall);
+      case 'org.freedesktop.portal.MemoryMonitor':
+        return handleMemoryMonitorMethodCall(methodCall);
       case 'org.freedesktop.portal.NetworkMonitor':
         return handleNetworkMonitorMethodCall(methodCall);
       case 'org.freedesktop.portal.Notification':
         return handleNotificationMethodCall(methodCall);
       case 'org.freedesktop.portal.OpenURI':
         return handleOpenURIMethodCall(methodCall);
+      case 'org.freedesktop.portal.PowerProfileMonitor':
+        return handlePowerProfileMonitorMethodCall(methodCall);
+      case 'org.freedesktop.portal.Print':
+        return handlePrintMethodCall(methodCall);
       case 'org.freedesktop.portal.ProxyResolver':
         return handleProxyResolverMethodCall(methodCall);
+      case 'org.freedesktop.portal.RemoteDesktop':
+        return handleRemoteDesktopMethodCall(methodCall);
       case 'org.freedesktop.portal.ScreenCast':
         return handleScreenCastMethodCall(methodCall);
       case 'org.freedesktop.portal.Secret':
         return handleSecretMethodCall(methodCall);
       case 'org.freedesktop.portal.Settings':
         return handleSettingsMethodCall(methodCall);
+      case 'org.freedesktop.portal.Trash':
+        return handleTrashMethodCall(methodCall);
+      case 'org.freedesktop.portal.Wallpaper':
+        return handleWallpaperMethodCall(methodCall);
       default:
         return DBusMethodErrorResponse.unknownInterface();
     }
@@ -517,6 +562,14 @@ class MockPortalObject extends DBusObject {
     }
   }
 
+  Future<DBusMethodResponse> handleMemoryMonitorMethodCall(
+      DBusMethodCall methodCall) async {
+    switch (methodCall.name) {
+      default:
+        return DBusMethodErrorResponse.unknownMethod();
+    }
+  }
+
   Future<DBusMethodResponse> handleNetworkMonitorMethodCall(
       DBusMethodCall methodCall) async {
     switch (methodCall.name) {
@@ -570,6 +623,22 @@ class MockPortalObject extends DBusObject {
         var request = await server.addRequest(methodCall.sender, token);
         Future.delayed(Duration.zero, () async => await request.respond());
         return DBusMethodSuccessResponse([request.path]);
+      default:
+        return DBusMethodErrorResponse.unknownMethod();
+    }
+  }
+
+  Future<DBusMethodResponse> handlePowerProfileMonitorMethodCall(
+      DBusMethodCall methodCall) async {
+    switch (methodCall.name) {
+      default:
+        return DBusMethodErrorResponse.unknownMethod();
+    }
+  }
+
+  Future<DBusMethodResponse> handlePrintMethodCall(
+      DBusMethodCall methodCall) async {
+    switch (methodCall.name) {
       default:
         return DBusMethodErrorResponse.unknownMethod();
     }
@@ -660,6 +729,14 @@ class MockPortalObject extends DBusObject {
     }
   }
 
+  Future<DBusMethodResponse> handleRemoteDesktopMethodCall(
+      DBusMethodCall methodCall) async {
+    switch (methodCall.name) {
+      default:
+        return DBusMethodErrorResponse.unknownMethod();
+    }
+  }
+
   Future<DBusMethodResponse> handleSecretMethodCall(
       DBusMethodCall methodCall) async {
     switch (methodCall.name) {
@@ -709,6 +786,29 @@ class MockPortalObject extends DBusObject {
     }
   }
 
+  Future<DBusMethodResponse> handleTrashMethodCall(
+      DBusMethodCall methodCall) async {
+    switch (methodCall.name) {
+      case 'TrashFile':
+        var handle = methodCall.values[0].asUnixFd();
+        var file = handle.toFile();
+        var contents = utf8.decode(await file.read(1024));
+        server.trashedFiles.add(contents);
+        var result = server.trashFileResults[contents] ?? 1;
+        return DBusMethodSuccessResponse([DBusUint32(result)]);
+      default:
+        return DBusMethodErrorResponse.unknownMethod();
+    }
+  }
+
+  Future<DBusMethodResponse> handleWallpaperMethodCall(
+      DBusMethodCall methodCall) async {
+    switch (methodCall.name) {
+      default:
+        return DBusMethodErrorResponse.unknownMethod();
+    }
+  }
+
   @override
   Future<DBusMethodResponse> getProperty(String interface, String name) async {
     switch (interface) {
@@ -724,20 +824,34 @@ class MockPortalObject extends DBusObject {
         return getFileChooserProperty(name);
       case 'org.freedesktop.portal.Location':
         return getLocationProperty(name);
+      case 'org.freedesktop.portal.MemoryMonitor':
+        return getMemoryMonitorProperty(name);
       case 'org.freedesktop.portal.NetworkMonitor':
         return getNetworkMonitorProperty(name);
       case 'org.freedesktop.portal.Notification':
         return getNotificationProperty(name);
       case 'org.freedesktop.portal.OpenURI':
         return getOpenURIProperty(name);
+      case 'org.freedesktop.portal.PowerProfileMonitor':
+        return getPowerProfileMonitorProperty(name);
+      case 'org.freedesktop.portal.Print':
+        return getPrintProperty(name);
       case 'org.freedesktop.portal.ProxyResolver':
         return getProxyResolverProperty(name);
+      case 'org.freedesktop.portal.RemoteDesktop':
+        return getRemoteDesktopProperty(name);
+      case 'org.freedesktop.portal.ScreenCast':
+        return getScreenCastProperty(name);
       case 'org.freedesktop.portal.ScreenCast':
         return getScreenCastProperty(name);
       case 'org.freedesktop.portal.Secret':
         return getSecretProperty(name);
       case 'org.freedesktop.portal.Settings':
         return getSettingsProperty(name);
+      case 'org.freedesktop.portal.Trash':
+        return getTrashProperty(name);
+      case 'org.freedesktop.portal.Wallpaper':
+        return getWallpaperProperty(name);
       default:
         return DBusMethodErrorResponse.unknownProperty();
     }
@@ -797,6 +911,15 @@ class MockPortalObject extends DBusObject {
     }
   }
 
+  Future<DBusMethodResponse> getMemoryMonitorProperty(String name) async {
+    switch (name) {
+      case 'version':
+        return DBusGetPropertyResponse(DBusUint32(1));
+      default:
+        return DBusMethodErrorResponse.unknownProperty();
+    }
+  }
+
   Future<DBusMethodResponse> getNetworkMonitorProperty(String name) async {
     switch (name) {
       case 'version':
@@ -824,7 +947,34 @@ class MockPortalObject extends DBusObject {
     }
   }
 
+  Future<DBusMethodResponse> getPowerProfileMonitorProperty(String name) async {
+    switch (name) {
+      case 'version':
+        return DBusGetPropertyResponse(DBusUint32(1));
+      default:
+        return DBusMethodErrorResponse.unknownProperty();
+    }
+  }
+
+  Future<DBusMethodResponse> getPrintProperty(String name) async {
+    switch (name) {
+      case 'version':
+        return DBusGetPropertyResponse(DBusUint32(1));
+      default:
+        return DBusMethodErrorResponse.unknownProperty();
+    }
+  }
+
   Future<DBusMethodResponse> getProxyResolverProperty(String name) async {
+    switch (name) {
+      case 'version':
+        return DBusGetPropertyResponse(DBusUint32(1));
+      default:
+        return DBusMethodErrorResponse.unknownProperty();
+    }
+  }
+
+  Future<DBusMethodResponse> getRemoteDesktopProperty(String name) async {
     switch (name) {
       case 'version':
         return DBusGetPropertyResponse(DBusUint32(1));
@@ -836,7 +986,7 @@ class MockPortalObject extends DBusObject {
   Future<DBusMethodResponse> getScreenCastProperty(String name) async {
     switch (name) {
       case 'version':
-        return DBusGetPropertyResponse(DBusUint32(1));
+        return DBusGetPropertyResponse(DBusUint32(4));
       case 'AvailableSourceTypes':
         return DBusGetPropertyResponse(DBusUint32(1));
       case 'AvailableCursorModes':
@@ -863,6 +1013,136 @@ class MockPortalObject extends DBusObject {
         return DBusMethodErrorResponse.unknownProperty();
     }
   }
+
+  Future<DBusMethodResponse> getTrashProperty(String name) async {
+    switch (name) {
+      case 'version':
+        return DBusGetPropertyResponse(DBusUint32(1));
+      default:
+        return DBusMethodErrorResponse.unknownProperty();
+    }
+  }
+
+  Future<DBusMethodResponse> getWallpaperProperty(String name) async {
+    switch (name) {
+      case 'version':
+        return DBusGetPropertyResponse(DBusUint32(1));
+      default:
+        return DBusMethodErrorResponse.unknownProperty();
+    }
+  }
+}
+
+class MockPortalDocumentsObject extends DBusObject {
+  final MockPortalDocumentsServer server;
+
+  MockPortalDocumentsObject(this.server)
+      : super(DBusObjectPath('/org/freedesktop/portal/documents'));
+
+  @override
+  Future<DBusMethodResponse> handleMethodCall(DBusMethodCall methodCall) async {
+    switch (methodCall.interface) {
+      case 'org.freedesktop.portal.Documents':
+        return handleDocumentsMethodCall(methodCall);
+      case 'org.freedesktop.portal.FileTransfer':
+        return handleFileTransferMethodCall(methodCall);
+      default:
+        return DBusMethodErrorResponse.unknownInterface();
+    }
+  }
+
+  Future<DBusMethodResponse> handleDocumentsMethodCall(
+      DBusMethodCall methodCall) async {
+    switch (methodCall.name) {
+      case 'GetMountPoint':
+        return DBusMethodSuccessResponse(
+            [DBusArray.byte(server.mountPoint ?? Uint8List(0))]);
+      case 'AddFull':
+        var handles = methodCall.values[0].asUnixFdArray();
+        var flags = methodCall.values[1].asUint32();
+        var appId = methodCall.values[2].asString();
+        var permissions = <String, Set<String>>{};
+        if (appId != '') {
+          permissions[appId] =
+              Set<String>.from(methodCall.values[3].asStringArray());
+        }
+        var docIds = <String>[];
+        for (var handle in handles) {
+          var file = handle.toFile();
+          // The real documents portal gets the path from /proc/self/fd, for tests we will use the file contents.
+          var path = await file.read(1024);
+          var docId = server.addDocument(
+              MockDocument(path, flags: flags, permissions: permissions));
+          await file.close();
+          docIds.add(docId);
+        }
+        return DBusMethodSuccessResponse(
+            [DBusArray.string(docIds), DBusDict.stringVariant({})]);
+      case 'GrantPermissions':
+        var docId = methodCall.values[0].asString();
+        var appId = methodCall.values[1].asString();
+        var permissions = methodCall.values[2].asStringArray();
+        var doc = server.documents[docId]!;
+        if (doc.permissions[appId] == null) {
+          doc.permissions[appId] = {};
+        }
+        doc.permissions[appId]!.addAll(permissions);
+        return DBusMethodSuccessResponse();
+      case 'RevokePermissions':
+        var docId = methodCall.values[0].asString();
+        var appId = methodCall.values[1].asString();
+        var permissions = methodCall.values[2].asStringArray();
+        var doc = server.documents[docId]!;
+        for (var p in permissions) {
+          doc.permissions[appId]?.remove(p);
+        }
+        return DBusMethodSuccessResponse();
+      case 'Delete':
+        var docId = methodCall.values[0].asString();
+        server.documents.remove(docId);
+        return DBusMethodSuccessResponse();
+      default:
+        return DBusMethodErrorResponse.unknownMethod();
+    }
+  }
+
+  Future<DBusMethodResponse> handleFileTransferMethodCall(
+      DBusMethodCall methodCall) async {
+    switch (methodCall.name) {
+      default:
+        return DBusMethodErrorResponse.unknownMethod();
+    }
+  }
+
+  @override
+  Future<DBusMethodResponse> getProperty(String interface, String name) async {
+    switch (interface) {
+      case 'org.freedesktop.portal.Documents':
+        return getDocumentsProperty(name);
+      case 'org.freedesktop.portal.FileTransfer':
+        return getFileTransferProperty(name);
+      default:
+        return DBusMethodErrorResponse.unknownProperty();
+    }
+  }
+
+  Future<DBusMethodResponse> getDocumentsProperty(String name) async {
+    switch (name) {
+      case 'version':
+        return DBusGetPropertyResponse(DBusUint32(4));
+      default:
+        return DBusMethodErrorResponse.unknownProperty();
+    }
+  }
+
+  Future<DBusMethodResponse> getFileTransferProperty(String name) async {
+    switch (name) {
+      case 'version':
+        return DBusGetPropertyResponse(DBusUint32(1));
+      default:
+        return DBusMethodErrorResponse.unknownProperty();
+    }
+  }
 }
 
 class MockRequestResponse {
@@ -872,8 +1152,8 @@ class MockRequestResponse {
   MockRequestResponse(this.response, this.result);
 }
 
-class MockPortalServer extends DBusClient {
-  late final MockPortalObject _root;
+class MockPortalDesktopServer extends DBusClient {
+  late final MockPortalDesktopObject _root;
 
   final requests = <MockPortalRequestObject>[];
   final sessions = <DBusObjectPath, MockPortalSessionObject>{};
@@ -887,7 +1167,7 @@ class MockPortalServer extends DBusClient {
   final MockRequestResponse? saveFilesResponse;
   late final Map<String, Map<String, DBusValue>> notifications;
   final Map<String, List<String>> proxies;
-  final Map<String, Map<String, DBusValue>> settingsValues;
+  late final Map<String, Map<String, DBusValue>> settingsValues;
   final List<Map<String, DBusValue>> locations;
   final bool closeLocationSession;
   bool networkAvailable;
@@ -896,6 +1176,8 @@ class MockPortalServer extends DBusClient {
   final String? screenCastSessionHandle;
   final List<ScreenCastStream>? screenCastStreamsList;
   List<int> secret;
+  final trashedFiles = <String>[];
+  final Map<String, int> trashFileResults;
 
   final accountDialogs = <MockAccountDialog>[];
   final background = <MockBackground>[];
@@ -910,28 +1192,29 @@ class MockPortalServer extends DBusClient {
   final _locationSessions = <DBusObjectPath, MockLocationSession>{};
   final screenCast = <MockScreenCast>[];
 
-  MockPortalServer(
-    DBusAddress clientAddress, {
-    this.userId,
-    this.userName,
-    this.userImage,
-    this.openFileResponse,
-    this.saveFileResponse,
-    this.saveFilesResponse,
-    Map<String, Map<String, DBusValue>>? notifications,
-    this.proxies = const {},
-    this.settingsValues = const {},
-    this.locations = const [],
-    this.closeLocationSession = false,
-    this.networkAvailable = true,
-    this.networkMetered = false,
-    this.networkConnectivity = 3,
-    this.screenCastSessionHandle,
-    this.screenCastStreamsList,
-    this.secret = const [],
-  }) : super(clientAddress) {
-    _root = MockPortalObject(this);
+  MockPortalDesktopServer(DBusAddress clientAddress,
+      {this.userId,
+      this.userName,
+      this.userImage,
+      this.openFileResponse,
+      this.saveFileResponse,
+      this.saveFilesResponse,
+      Map<String, Map<String, DBusValue>>? notifications,
+      this.proxies = const {},
+      Map<String, Map<String, DBusValue>>? settingsValues,
+      this.locations = const [],
+      this.closeLocationSession = false,
+      this.networkAvailable = true,
+      this.networkMetered = false,
+      this.networkConnectivity = 3,
+      this.screenCastSessionHandle,
+      this.screenCastStreamsList,
+      this.secret = const [],
+      this.trashFileResults = const {}})
+      : super(clientAddress) {
+    _root = MockPortalDesktopObject(this);
     this.notifications = notifications ?? {};
+    this.settingsValues = settingsValues ?? {};
   }
 
   Future<void> start() async {
@@ -951,6 +1234,15 @@ class MockPortalServer extends DBusClient {
       networkConnectivity = connectivity;
     }
     await _root.emitSignal('org.freedesktop.portal.NetworkMonitor', 'changed');
+  }
+
+  Future<void> setSetting(String namespace, String key, DBusValue value) async {
+    if (!settingsValues.containsKey(namespace)) {
+      settingsValues[namespace] = {};
+    }
+    settingsValues[namespace]![key] = value;
+    await _root.emitSignal('org.freedesktop.portal.Settings', 'SettingChanged',
+        [DBusString(namespace), DBusString(key), DBusVariant(value)]);
   }
 
   /// Generate a token for requests and sessions.
@@ -993,6 +1285,36 @@ class MockPortalServer extends DBusClient {
   }
 }
 
+class MockPortalDocumentsServer extends DBusClient {
+  late final MockPortalDocumentsObject _root;
+
+  final Uint8List? mountPoint;
+  late final Map<String, MockDocument> documents;
+
+  MockPortalDocumentsServer(DBusAddress clientAddress,
+      {this.mountPoint, Map<String, MockDocument>? documents})
+      : super(clientAddress) {
+    this.documents = documents ?? {};
+    _root = MockPortalDocumentsObject(this);
+  }
+
+  Future<void> start() async {
+    await requestName('org.freedesktop.portal.Documents');
+    await registerObject(_root);
+  }
+
+  String addDocument(MockDocument document) {
+    final random = Random();
+    while (true) {
+      var token = '${random.nextInt(9999999)}';
+      if (!documents.containsKey(token)) {
+        documents[token] = document;
+        return token;
+      }
+    }
+  }
+}
+
 void main() {
   test('account', () async {
     var server = DBusServer();
@@ -1002,7 +1324,7 @@ void main() {
       await server.close();
     });
 
-    var portalServer = MockPortalServer(
+    var portalServer = MockPortalDesktopServer(
       clientAddress,
       userId: 'alice',
       userName: 'alice',
@@ -1065,7 +1387,7 @@ void main() {
       await server.close();
     });
 
-    var portalServer = MockPortalServer(clientAddress);
+    var portalServer = MockPortalDesktopServer(clientAddress);
     await portalServer.start();
     addTearDown(() async {
       await portalServer.close();
@@ -1127,7 +1449,7 @@ void main() {
       await server.close();
     });
 
-    var portalServer = MockPortalServer(clientAddress);
+    var portalServer = MockPortalDesktopServer(clientAddress);
     await portalServer.start();
     addTearDown(() async {
       await portalServer.close();
@@ -1152,7 +1474,7 @@ void main() {
       await server.close();
     });
 
-    var portalServer = MockPortalServer(clientAddress);
+    var portalServer = MockPortalDesktopServer(clientAddress);
     await portalServer.start();
     addTearDown(() async {
       await portalServer.close();
@@ -1167,6 +1489,160 @@ void main() {
     expect(result, isNotNull);
   });
 
+  test('documents - mount point', () async {
+    var server = DBusServer();
+    var clientAddress =
+        await server.listenAddress(DBusAddress.unix(dir: Directory.systemTemp));
+    addTearDown(() async {
+      await server.close();
+    });
+
+    var portalServer = MockPortalDocumentsServer(clientAddress,
+        mountPoint: Uint8List.fromList(utf8.encode('/run/user/1000/doc')));
+    await portalServer.start();
+    addTearDown(() async {
+      await portalServer.close();
+    });
+
+    var client = XdgDesktopPortalClient(bus: DBusClient(clientAddress));
+    addTearDown(() async {
+      await client.close();
+    });
+
+    expect(await client.documents.getVersion(), equals(4));
+
+    var mountPoint = await client.documents.getMountPoint();
+    expect(mountPoint.path, equals('/run/user/1000/doc'));
+  });
+
+  test('documents - add', () async {
+    var server = DBusServer();
+    var clientAddress =
+        await server.listenAddress(DBusAddress.unix(dir: Directory.systemTemp));
+    addTearDown(() async {
+      await server.close();
+    });
+
+    var portalServer = MockPortalDocumentsServer(clientAddress);
+    await portalServer.start();
+    addTearDown(() async {
+      await portalServer.close();
+    });
+
+    var client = XdgDesktopPortalClient(bus: DBusClient(clientAddress));
+    addTearDown(() async {
+      await client.close();
+    });
+
+    var dir = await Directory.systemTemp.createTemp('xdg-portal-dart');
+    addTearDown(() async {
+      await dir.delete(recursive: true);
+    });
+    var path = '${dir.path}/document';
+    var file = File(path);
+    // Set the contents to the path we will use in the tests.
+    await file.writeAsString('/home/example/image.png');
+    var docIds = await client.documents.add([file]);
+    expect(
+        portalServer.documents,
+        equals({
+          docIds[0]: MockDocument(
+              Uint8List.fromList(utf8.encode('/home/example/image.png')))
+        }));
+  });
+
+  test('documents - permissions', () async {
+    var server = DBusServer();
+    var clientAddress =
+        await server.listenAddress(DBusAddress.unix(dir: Directory.systemTemp));
+    addTearDown(() async {
+      await server.close();
+    });
+
+    var portalServer = MockPortalDocumentsServer(clientAddress, documents: {
+      '123456': MockDocument(
+          Uint8List.fromList(utf8.encode('/home/example/image.png')))
+    });
+    await portalServer.start();
+    addTearDown(() async {
+      await portalServer.close();
+    });
+
+    var client = XdgDesktopPortalClient(bus: DBusClient(clientAddress));
+    addTearDown(() async {
+      await client.close();
+    });
+
+    await client.documents.grantPermissions('123456', 'com.example.App1', {
+      XdgDocumentPermission.read,
+      XdgDocumentPermission.write,
+      XdgDocumentPermission.grantPermissions,
+      XdgDocumentPermission.delete
+    });
+    expect(
+        portalServer.documents,
+        equals({
+          '123456': MockDocument(
+              Uint8List.fromList(utf8.encode('/home/example/image.png')),
+              permissions: {
+                'com.example.App1': {
+                  'read',
+                  'write',
+                  'grant-permissions',
+                  'delete'
+                }
+              })
+        }));
+    await client.documents.revokePermissions('123456', 'com.example.App1', {
+      XdgDocumentPermission.write,
+      XdgDocumentPermission.grantPermissions,
+      XdgDocumentPermission.delete
+    });
+    expect(
+        portalServer.documents,
+        equals({
+          '123456': MockDocument(
+              Uint8List.fromList(utf8.encode('/home/example/image.png')),
+              permissions: {
+                'com.example.App1': {'read'}
+              })
+        }));
+  });
+
+  test('documents - delete ', () async {
+    var server = DBusServer();
+    var clientAddress =
+        await server.listenAddress(DBusAddress.unix(dir: Directory.systemTemp));
+    addTearDown(() async {
+      await server.close();
+    });
+
+    var portalServer = MockPortalDocumentsServer(clientAddress, documents: {
+      '123456': MockDocument(
+          Uint8List.fromList(utf8.encode('/home/example/image.png'))),
+      '123457': MockDocument(
+          Uint8List.fromList(utf8.encode('/home/example/README.md')))
+    });
+    await portalServer.start();
+    addTearDown(() async {
+      await portalServer.close();
+    });
+
+    var client = XdgDesktopPortalClient(bus: DBusClient(clientAddress));
+    addTearDown(() async {
+      await client.close();
+    });
+
+    expect(portalServer.documents, hasLength(2));
+    await client.documents.delete('123456');
+    expect(
+        portalServer.documents,
+        equals({
+          '123457': MockDocument(
+              Uint8List.fromList(utf8.encode('/home/example/README.md')))
+        }));
+  });
+
   test('email', () async {
     var server = DBusServer();
     var clientAddress =
@@ -1175,7 +1651,7 @@ void main() {
       await server.close();
     });
 
-    var portalServer = MockPortalServer(clientAddress);
+    var portalServer = MockPortalDesktopServer(clientAddress);
     await portalServer.start();
     addTearDown(() async {
       await portalServer.close();
@@ -1219,7 +1695,7 @@ void main() {
       await server.close();
     });
 
-    var portalServer = MockPortalServer(clientAddress,
+    var portalServer = MockPortalDesktopServer(clientAddress,
         openFileResponse: MockRequestResponse(0, {
           'uris': DBusArray.string(['file://home/me/image.png'])
         }));
@@ -1251,7 +1727,7 @@ void main() {
       await server.close();
     });
 
-    var portalServer = MockPortalServer(clientAddress,
+    var portalServer = MockPortalDesktopServer(clientAddress,
         openFileResponse: MockRequestResponse(0, {
           'uris': DBusArray.string(['file://home/me/image.png']),
           'choices': DBusArray(DBusSignature('(ss)'), [
@@ -1365,7 +1841,7 @@ void main() {
       await server.close();
     });
 
-    var portalServer = MockPortalServer(clientAddress,
+    var portalServer = MockPortalDesktopServer(clientAddress,
         saveFileResponse: MockRequestResponse(0, {
           'uris': DBusArray.string(['file://home/me/image.png'])
         }));
@@ -1395,7 +1871,7 @@ void main() {
       await server.close();
     });
 
-    var portalServer = MockPortalServer(clientAddress,
+    var portalServer = MockPortalDesktopServer(clientAddress,
         saveFileResponse: MockRequestResponse(0, {
           'uris': DBusArray.string(['file://home/me/image.png']),
           'choices': DBusArray(DBusSignature('(ss)'), [
@@ -1502,7 +1978,7 @@ void main() {
       await server.close();
     });
 
-    var portalServer = MockPortalServer(clientAddress,
+    var portalServer = MockPortalDesktopServer(clientAddress,
         saveFilesResponse: MockRequestResponse(0, {
           'uris': DBusArray.string(['file://home/me/image.png'])
         }));
@@ -1531,7 +2007,7 @@ void main() {
       await server.close();
     });
 
-    var portalServer = MockPortalServer(clientAddress,
+    var portalServer = MockPortalDesktopServer(clientAddress,
         saveFilesResponse: MockRequestResponse(0, {
           'uris': DBusArray.string(['file://home/me/image.png']),
           'choices': DBusArray(DBusSignature('(ss)'), [
@@ -1604,14 +2080,13 @@ void main() {
       await server.close();
     });
 
-    var portalServer = MockPortalServer(clientAddress);
+    var portalServer = MockPortalDesktopServer(clientAddress);
     await portalServer.start();
     addTearDown(() async {
       await portalServer.close();
     });
 
-    var busClient = DBusClient(clientAddress);
-    var client = XdgDesktopPortalClient(bus: busClient);
+    var client = XdgDesktopPortalClient(bus: DBusClient(clientAddress));
     addTearDown(() async {
       await client.close();
     });
@@ -1620,7 +2095,7 @@ void main() {
     var subscription = stream.listen(expectAsync1((result) {}, count: 0));
 
     // Ensure that the session has been created and then check for it.
-    await busClient.ping();
+    await client.fileChooser.getVersion();
     expect(portalServer.openFileDialogs, hasLength(1));
 
     // Ensure the dialog is removed when the request is cancelled.
@@ -1636,7 +2111,7 @@ void main() {
       await server.close();
     });
 
-    var portalServer = MockPortalServer(clientAddress,
+    var portalServer = MockPortalDesktopServer(clientAddress,
         openFileResponse: MockRequestResponse(1, {}));
     await portalServer.start();
     addTearDown(() async {
@@ -1662,7 +2137,7 @@ void main() {
       await server.close();
     });
 
-    var portalServer = MockPortalServer(clientAddress,
+    var portalServer = MockPortalDesktopServer(clientAddress,
         openFileResponse: MockRequestResponse(0, {}),
         saveFileResponse: MockRequestResponse(0, {}),
         saveFilesResponse: MockRequestResponse(0, {}));
@@ -1696,7 +2171,7 @@ void main() {
       await server.close();
     });
 
-    var portalServer = MockPortalServer(clientAddress,
+    var portalServer = MockPortalDesktopServer(clientAddress,
         openFileResponse: MockRequestResponse(2, {}));
     await portalServer.start();
     addTearDown(() async {
@@ -1713,6 +2188,28 @@ void main() {
     expect(() => stream.first, throwsA(isA<XdgPortalRequestFailedException>()));
   });
 
+  test('file transfer', () async {
+    var server = DBusServer();
+    var clientAddress =
+        await server.listenAddress(DBusAddress.unix(dir: Directory.systemTemp));
+    addTearDown(() async {
+      await server.close();
+    });
+
+    var portalServer = MockPortalDocumentsServer(clientAddress);
+    await portalServer.start();
+    addTearDown(() async {
+      await portalServer.close();
+    });
+
+    var client = XdgDesktopPortalClient(bus: DBusClient(clientAddress));
+    addTearDown(() async {
+      await client.close();
+    });
+
+    expect(await client.fileTransfer.getVersion(), equals(1));
+  });
+
   test('location', () async {
     var server = DBusServer();
     var clientAddress =
@@ -1721,7 +2218,7 @@ void main() {
       await server.close();
     });
 
-    var portalServer = MockPortalServer(clientAddress, locations: [
+    var portalServer = MockPortalDesktopServer(clientAddress, locations: [
       <String, DBusValue>{
         'Latitude': DBusDouble(40.9),
         'Longitude': DBusDouble(174.9),
@@ -1797,7 +2294,7 @@ void main() {
       await server.close();
     });
 
-    var portalServer = MockPortalServer(clientAddress, locations: [
+    var portalServer = MockPortalDesktopServer(clientAddress, locations: [
       <String, DBusValue>{
         'Latitude': DBusDouble(40.9),
         'Longitude': DBusDouble(174.9),
@@ -1848,7 +2345,7 @@ void main() {
       await server.close();
     });
 
-    var portalServer = MockPortalServer(clientAddress,
+    var portalServer = MockPortalDesktopServer(clientAddress,
         locations: [
           <String, DBusValue>{
             'Latitude': DBusDouble(40.9),
@@ -1909,6 +2406,28 @@ void main() {
         ]));
   });
 
+  test('memory monitor', () async {
+    var server = DBusServer();
+    var clientAddress =
+        await server.listenAddress(DBusAddress.unix(dir: Directory.systemTemp));
+    addTearDown(() async {
+      await server.close();
+    });
+
+    var portalServer = MockPortalDesktopServer(clientAddress);
+    await portalServer.start();
+    addTearDown(() async {
+      await portalServer.close();
+    });
+
+    var client = XdgDesktopPortalClient(bus: DBusClient(clientAddress));
+    addTearDown(() async {
+      await client.close();
+    });
+
+    expect(await client.memoryMonitor.getVersion(), equals(1));
+  });
+
   test('network monitor - status', () async {
     var server = DBusServer();
     var clientAddress =
@@ -1917,7 +2436,7 @@ void main() {
       await server.close();
     });
 
-    var portalServer = MockPortalServer(clientAddress,
+    var portalServer = MockPortalDesktopServer(clientAddress,
         networkAvailable: true, networkMetered: true, networkConnectivity: 0);
     await portalServer.start();
     addTearDown(() async {
@@ -1983,7 +2502,7 @@ void main() {
       await server.close();
     });
 
-    var portalServer = MockPortalServer(clientAddress);
+    var portalServer = MockPortalDesktopServer(clientAddress);
     await portalServer.start();
     addTearDown(() async {
       await portalServer.close();
@@ -2007,7 +2526,7 @@ void main() {
       await server.close();
     });
 
-    var portalServer = MockPortalServer(clientAddress);
+    var portalServer = MockPortalDesktopServer(clientAddress);
     await portalServer.start();
     addTearDown(() async {
       await portalServer.close();
@@ -2059,7 +2578,7 @@ void main() {
       await server.close();
     });
 
-    var portalServer = MockPortalServer(clientAddress);
+    var portalServer = MockPortalDesktopServer(clientAddress);
     await portalServer.start();
     addTearDown(() async {
       await portalServer.close();
@@ -2094,7 +2613,7 @@ void main() {
       await server.close();
     });
 
-    var portalServer = MockPortalServer(clientAddress);
+    var portalServer = MockPortalDesktopServer(clientAddress);
     await portalServer.start();
     addTearDown(() async {
       await portalServer.close();
@@ -2129,7 +2648,7 @@ void main() {
       await server.close();
     });
 
-    var portalServer = MockPortalServer(clientAddress);
+    var portalServer = MockPortalDesktopServer(clientAddress);
     await portalServer.start();
     addTearDown(() async {
       await portalServer.close();
@@ -2163,7 +2682,7 @@ void main() {
       await server.close();
     });
 
-    var portalServer = MockPortalServer(clientAddress);
+    var portalServer = MockPortalDesktopServer(clientAddress);
     await portalServer.start();
     addTearDown(() async {
       await portalServer.close();
@@ -2200,7 +2719,7 @@ void main() {
       await server.close();
     });
 
-    var portalServer = MockPortalServer(clientAddress,
+    var portalServer = MockPortalDesktopServer(clientAddress,
         notifications: {'122': {}, '123': {}, '124': {}});
     await portalServer.start();
     addTearDown(() async {
@@ -2224,7 +2743,7 @@ void main() {
       await server.close();
     });
 
-    var portalServer = MockPortalServer(clientAddress);
+    var portalServer = MockPortalDesktopServer(clientAddress);
     await portalServer.start();
     addTearDown(() async {
       await portalServer.close();
@@ -2253,6 +2772,72 @@ void main() {
         ]));
   });
 
+  test('power profile monitor', () async {
+    var server = DBusServer();
+    var clientAddress =
+        await server.listenAddress(DBusAddress.unix(dir: Directory.systemTemp));
+    addTearDown(() async {
+      await server.close();
+    });
+
+    var portalServer = MockPortalDesktopServer(clientAddress);
+    await portalServer.start();
+    addTearDown(() async {
+      await portalServer.close();
+    });
+
+    var client = XdgDesktopPortalClient(bus: DBusClient(clientAddress));
+    addTearDown(() async {
+      await client.close();
+    });
+
+    expect(await client.powerProfileMonitor.getVersion(), equals(1));
+  });
+
+  test('print', () async {
+    var server = DBusServer();
+    var clientAddress =
+        await server.listenAddress(DBusAddress.unix(dir: Directory.systemTemp));
+    addTearDown(() async {
+      await server.close();
+    });
+
+    var portalServer = MockPortalDesktopServer(clientAddress);
+    await portalServer.start();
+    addTearDown(() async {
+      await portalServer.close();
+    });
+
+    var client = XdgDesktopPortalClient(bus: DBusClient(clientAddress));
+    addTearDown(() async {
+      await client.close();
+    });
+
+    expect(await client.print.getVersion(), equals(1));
+  });
+
+  test('remote desktop', () async {
+    var server = DBusServer();
+    var clientAddress =
+        await server.listenAddress(DBusAddress.unix(dir: Directory.systemTemp));
+    addTearDown(() async {
+      await server.close();
+    });
+
+    var portalServer = MockPortalDesktopServer(clientAddress);
+    await portalServer.start();
+    addTearDown(() async {
+      await portalServer.close();
+    });
+
+    var client = XdgDesktopPortalClient(bus: DBusClient(clientAddress));
+    addTearDown(() async {
+      await client.close();
+    });
+
+    expect(await client.remoteDesktop.getVersion(), equals(1));
+  });
+
   test('proxy resolver', () async {
     var server = DBusServer();
     var clientAddress =
@@ -2261,7 +2846,7 @@ void main() {
       await server.close();
     });
 
-    var portalServer = MockPortalServer(clientAddress, proxies: {
+    var portalServer = MockPortalDesktopServer(clientAddress, proxies: {
       'http://example.com': ['http://localhost:1234']
     });
     await portalServer.start();
@@ -2287,6 +2872,7 @@ void main() {
     addTearDown(() async {
       await server.close();
     });
+
     final screenCastStreamsList = [
       ScreenCastStream(
         nodeId: 1,
@@ -2308,7 +2894,7 @@ void main() {
       ),
     ];
 
-    var portalServer = MockPortalServer(
+    var portalServer = MockPortalDesktopServer(
       clientAddress,
       screenCastSessionHandle:
           '/org/freedesktop/portal/desktop/session/123/dart123',
@@ -2324,7 +2910,9 @@ void main() {
     addTearDown(() async {
       await client.close();
     });
-    expect(await client.screenCast.getVersion(), equals(1));
+
+    expect(await client.screenCast.getVersion(), equals(4));
+
     expect(
         await client.screenCast.getAvailableCursorModes(),
         equals(<ScreenCastAvailableCursorMode>{
@@ -2358,7 +2946,7 @@ void main() {
     });
 
     Uint8List secret = Uint8List.fromList(<int>[0, 100, 200, 255]);
-    var portalServer = MockPortalServer(clientAddress, secret: secret);
+    var portalServer = MockPortalDesktopServer(clientAddress, secret: secret);
     await portalServer.start();
     addTearDown(() async {
       await portalServer.close();
@@ -2381,7 +2969,7 @@ void main() {
       await server.close();
     });
 
-    var portalServer = MockPortalServer(clientAddress, settingsValues: {
+    var portalServer = MockPortalDesktopServer(clientAddress, settingsValues: {
       'com.example.test': {'name': DBusString('Fred')}
     });
     await portalServer.start();
@@ -2408,7 +2996,7 @@ void main() {
       await server.close();
     });
 
-    var portalServer = MockPortalServer(clientAddress, settingsValues: {
+    var portalServer = MockPortalDesktopServer(clientAddress, settingsValues: {
       'com.example.test1': {
         'name': DBusString('Fred'),
         'age': DBusUint32(42),
@@ -2441,5 +3029,108 @@ void main() {
             'age': DBusUint32(21)
           }
         }));
+  });
+
+  test('settings changed', () async {
+    var server = DBusServer();
+    var clientAddress =
+        await server.listenAddress(DBusAddress.unix(dir: Directory.systemTemp));
+    addTearDown(() async {
+      await server.close();
+    });
+
+    var portalServer = MockPortalDesktopServer(clientAddress, settingsValues: {
+      'com.example.test': {'name': DBusString('Foo')}
+    });
+    await portalServer.start();
+    addTearDown(() async {
+      await portalServer.close();
+    });
+
+    var client = XdgDesktopPortalClient(bus: DBusClient(clientAddress));
+    addTearDown(() async {
+      await client.close();
+    });
+
+    expect(
+        client.settings.settingChanged,
+        emitsInOrder([
+          XdgSettingChangeEvent(
+              'com.example.test', 'name', DBusString('Hello')),
+          XdgSettingChangeEvent(
+              'com.example.test', 'name', DBusString('World')),
+        ]));
+
+    // Read setting to ensure we are subscribed to changes.
+    expect(await client.settings.read('com.example.test', 'name'),
+        equals(DBusString('Foo')));
+
+    // Change value to trigeer events.
+    await portalServer.setSetting(
+        'com.example.test', 'name', DBusString('Hello'));
+    await portalServer.setSetting(
+        'com.example.test', 'name', DBusString('World'));
+  });
+
+  test('trash', () async {
+    var server = DBusServer();
+    var clientAddress =
+        await server.listenAddress(DBusAddress.unix(dir: Directory.systemTemp));
+    addTearDown(() async {
+      await server.close();
+    });
+
+    var portalServer =
+        MockPortalDesktopServer(clientAddress, trashFileResults: {'ERROR': 0});
+    await portalServer.start();
+    addTearDown(() async {
+      await portalServer.close();
+    });
+
+    var client = XdgDesktopPortalClient(bus: DBusClient(clientAddress));
+    addTearDown(() async {
+      await client.close();
+    });
+
+    var dir = await Directory.systemTemp.createTemp('xdg-portal-dart');
+    addTearDown(() async {
+      await dir.delete(recursive: true);
+    });
+
+    var path = '${dir.path}/file-to-trash';
+    await File(path).writeAsString('DELETE ME');
+
+    var errorPath = '${dir.path}/file-fail-trash';
+    await File(errorPath).writeAsString('ERROR');
+
+    expect(await client.trash.getVersion(), equals(1));
+
+    await client.trash.trashFile(File(path));
+    expect(portalServer.trashedFiles, equals(['DELETE ME']));
+
+    expect(() => client.trash.trashFile(File(errorPath)),
+        throwsA(isA<XdgTrashFileException>()));
+  });
+
+  test('wallpaper', () async {
+    var server = DBusServer();
+    var clientAddress =
+        await server.listenAddress(DBusAddress.unix(dir: Directory.systemTemp));
+    addTearDown(() async {
+      await server.close();
+    });
+
+    var portalServer = MockPortalDesktopServer(clientAddress);
+    await portalServer.start();
+    addTearDown(() async {
+      await portalServer.close();
+    });
+
+    var client = XdgDesktopPortalClient(bus: DBusClient(clientAddress));
+    addTearDown(() async {
+      await client.close();
+    });
+
+    expect(await client.wallpaper.getVersion(), equals(1));
   });
 }
