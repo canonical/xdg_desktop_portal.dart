@@ -664,13 +664,16 @@ class MockPortalDesktopObject extends DBusObject {
         server.screenCast.add(MockScreenCast(options));
         var token =
             options['handle_token']?.asString() ?? server.generateToken();
+        var sessionToken = options['session_handle_token']?.asString() ??
+            server.generateToken();
         options.removeWhere((key, value) => key == 'handle_token');
         options.removeWhere((key, value) => key == 'session_handle_token');
         var request = await server.addRequest(methodCall.sender, token);
         Future.delayed(
             Duration.zero,
             () async => await request.respond(result: <String, DBusValue>{
-                  'session_handle': DBusString(server.screenCastSessionHandle!)
+                  'session_handle': DBusString(
+                      '/org/freedesktop/portal/desktop/session/$sessionToken/$token')
                 }));
         return DBusMethodSuccessResponse([request.path]);
       case 'SelectSources':
@@ -840,8 +843,6 @@ class MockPortalDesktopObject extends DBusObject {
         return getProxyResolverProperty(name);
       case 'org.freedesktop.portal.RemoteDesktop':
         return getRemoteDesktopProperty(name);
-      case 'org.freedesktop.portal.ScreenCast':
-        return getScreenCastProperty(name);
       case 'org.freedesktop.portal.ScreenCast':
         return getScreenCastProperty(name);
       case 'org.freedesktop.portal.Secret':
@@ -1173,7 +1174,7 @@ class MockPortalDesktopServer extends DBusClient {
   bool networkAvailable;
   bool networkMetered;
   int networkConnectivity;
-  final String? screenCastSessionHandle;
+
   final List<ScreenCastStream>? screenCastStreamsList;
   List<int> secret;
   final trashedFiles = <String>[];
@@ -1207,7 +1208,6 @@ class MockPortalDesktopServer extends DBusClient {
       this.networkAvailable = true,
       this.networkMetered = false,
       this.networkConnectivity = 3,
-      this.screenCastSessionHandle,
       this.screenCastStreamsList,
       this.secret = const [],
       this.trashFileResults = const {}})
@@ -2896,8 +2896,6 @@ void main() {
 
     var portalServer = MockPortalDesktopServer(
       clientAddress,
-      screenCastSessionHandle:
-          '/org/freedesktop/portal/desktop/session/123/dart123',
       screenCastStreamsList: screenCastStreamsList,
     );
 
