@@ -1125,6 +1125,32 @@ class MockPortalDesktopServer extends DBusClient {
     await registerObject(_root);
   }
 
+  /// Emulate clicking a notification.
+  ///
+  /// [action] is the action to invoke, or null to invoke the default action.
+  Future<void> clickNotification(String id, String? action) async {
+    var notification = notifications[id]!;
+    if (action == null) {
+      action = notification['default-action']!.asString();
+    } else {
+      final List<Map<DBusValue, DBusValue>> buttons = notification['buttons']!
+          .asArray()
+          .map((e) => (e as DBusDict).asDict())
+          .toList();
+      final actions = buttons.map(
+        (e) => (e)[DBusString('action')]!.asVariant(),
+      );
+      assert(actions.contains(DBusString(action)));
+    }
+    print('clicking notification $id, action $action');
+    notifications.remove(id);
+    await _root.emitSignal(
+      'org.freedesktop.portal.Notification',
+      'ActionInvoked',
+      [DBusString(id), DBusString(action), DBusArray.variant([])],
+    );
+  }
+
   Future<void> setNetworkStatus(
       {bool? available, bool? metered, int? connectivity}) async {
     if (available != null) {
@@ -2636,6 +2662,99 @@ void main() {
 
     await client.notification.removeNotification('123');
     expect(portalServer.notifications, equals({'122': {}, '124': {}}));
+  });
+
+  test('invoke notification action default', () async {
+    var server = DBusServer();
+    var clientAddress =
+        await server.listenAddress(DBusAddress.unix(dir: Directory.systemTemp));
+    addTearDown(() async {
+      await server.close();
+    });
+
+    var portalServer = MockPortalDesktopServer(
+      clientAddress,
+      notifications: {
+        '001': {
+          'title': DBusString('Title'),
+          'body': DBusString('Lorem Ipsum'),
+          'priority': DBusString('high'),
+          'default-action': DBusString('defaultAction-001'),
+          'buttons': DBusArray(DBusSignature('a{sv}'), [
+            DBusDict.stringVariant({
+              'label': DBusString('Button 1'),
+              'action': DBusString('action1-001')
+            }),
+            DBusDict.stringVariant({
+              'label': DBusString('Button 2'),
+              'action': DBusString('action2-001')
+            })
+          ])
+        },
+        '002': {
+          'title': DBusString('Title'),
+          'body': DBusString('Lorem Ipsum'),
+          'priority': DBusString('high'),
+          'default-action': DBusString('defaultAction-002'),
+          'buttons': DBusArray(DBusSignature('a{sv}'), [
+            DBusDict.stringVariant({
+              'label': DBusString('Button 1'),
+              'action': DBusString('action1-002')
+            }),
+            DBusDict.stringVariant({
+              'label': DBusString('Button 2'),
+              'action': DBusString('action2-002')
+            })
+          ])
+        },
+        '003': {
+          'title': DBusString('Title'),
+          'body': DBusString('Lorem Ipsum'),
+          'priority': DBusString('high'),
+          'default-action': DBusString('defaultAction-003'),
+          'buttons': DBusArray(DBusSignature('a{sv}'), [
+            DBusDict.stringVariant({
+              'label': DBusString('Button 1'),
+              'action': DBusString('action1-003')
+            }),
+            DBusDict.stringVariant({
+              'label': DBusString('Button 2'),
+              'action': DBusString('action2-003')
+            })
+          ])
+        },
+      },
+    );
+    await portalServer.start();
+    addTearDown(() async {
+      await portalServer.close();
+    });
+
+    var client = XdgDesktopPortalClient(bus: DBusClient(clientAddress));
+    addTearDown(() async {
+      await client.close();
+    });
+
+    expect(
+        client.notification.actionInvoked,
+        emitsInOrder([
+          XdgNotificationActionInvokedEvent('001', 'defaultAction-001'),
+          XdgNotificationActionInvokedEvent('002', 'action1-002'),
+          XdgNotificationActionInvokedEvent('003', 'action2-003'),
+        ]));
+
+    client.notification.actionInvoked.listen((event) {
+      print(event);
+    });
+
+    await portalServer.clickNotification('001', null);
+    expect(portalServer.notifications.length, equals(2));
+
+    await portalServer.clickNotification('002', 'action1-002');
+    expect(portalServer.notifications.length, equals(1));
+
+    await portalServer.clickNotification('003', 'action2-003');
+    expect(portalServer.notifications.length, equals(0));
   });
 
   test('open uri', () async {

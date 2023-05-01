@@ -51,6 +51,29 @@ class XdgNotificationButton {
   XdgNotificationButton({required this.label, required this.action});
 }
 
+/// An event that is emitted when a notification action is invoked.
+class XdgNotificationActionInvokedEvent {
+  /// Id of the notification that this action was invoked on.
+  final String id;
+
+  /// Name of the action that was invoked.
+  final String action;
+
+  const XdgNotificationActionInvokedEvent(this.id, this.action);
+
+  @override
+  int get hashCode => Object.hash(id, action);
+
+  @override
+  bool operator ==(other) =>
+      other is XdgNotificationActionInvokedEvent &&
+      other.id == id &&
+      other.action == action;
+
+  @override
+  String toString() => '$runtimeType($id, $action)';
+}
+
 /// Portal to create notifications.
 class XdgNotificationPortal {
   final DBusRemoteObject _object;
@@ -130,4 +153,17 @@ class XdgNotificationPortal {
         'RemoveNotification', [DBusString(id)],
         replySignature: DBusSignature(''));
   }
+
+  /// Stream of invoked actions.
+  Stream<XdgNotificationActionInvokedEvent> get actionInvoked =>
+      DBusRemoteObjectSignalStream(
+        object: _object,
+        interface: 'org.freedesktop.portal.Notification',
+        name: 'ActionInvoked',
+        signature: DBusSignature(('ssav')),
+      ).map((DBusSignal signal) {
+        final id = signal.values[0].asString();
+        final action = signal.values[1].asString();
+        return XdgNotificationActionInvokedEvent(id, action);
+      });
 }
