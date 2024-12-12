@@ -344,7 +344,7 @@ class MockPortalDesktopObject extends DBusObject {
         options.removeWhere((key, value) => key == 'handle_token');
         var dialog = MockAccountDialog(parentWindow, options);
         server.accountDialogs.add(dialog);
-        var request = await server.addRequest(methodCall.sender, token,
+        var request = await server.addRequest(methodCall.sender!, token,
             onClosed: () async {
           server.accountDialogs.remove(dialog);
         });
@@ -375,7 +375,7 @@ class MockPortalDesktopObject extends DBusObject {
         var token =
             options['handle_token']?.asString() ?? server.generateToken();
         options.removeWhere((key, value) => key == 'handle_token');
-        var request = await server.addRequest(methodCall.sender, token);
+        var request = await server.addRequest(methodCall.sender!, token);
         Future.delayed(
             Duration.zero,
             () async => await request.respond(result: {
@@ -399,7 +399,7 @@ class MockPortalDesktopObject extends DBusObject {
         var token =
             options['handle_token']?.asString() ?? server.generateToken();
         options.removeWhere((key, value) => key == 'handle_token');
-        var request = await server.addRequest(methodCall.sender, token);
+        var request = await server.addRequest(methodCall.sender!, token);
         Future.delayed(Duration.zero, () async => await request.respond());
         return DBusMethodSuccessResponse([request.path]);
       case 'OpenPipeWireRemote':
@@ -420,7 +420,7 @@ class MockPortalDesktopObject extends DBusObject {
         var token =
             options['handle_token']?.asString() ?? server.generateToken();
         options.removeWhere((key, value) => key == 'handle_token');
-        var request = await server.addRequest(methodCall.sender, token);
+        var request = await server.addRequest(methodCall.sender!, token);
         Future.delayed(Duration.zero, () async => await request.respond());
         return DBusMethodSuccessResponse([request.path]);
       default:
@@ -440,7 +440,7 @@ class MockPortalDesktopObject extends DBusObject {
         options.removeWhere((key, value) => key == 'handle_token');
         var dialog = MockDialog(parentWindow, title, options);
         server.openFileDialogs.add(dialog);
-        var request = await server.addRequest(methodCall.sender, token,
+        var request = await server.addRequest(methodCall.sender!, token,
             onClosed: () async {
           server.openFileDialogs.remove(dialog);
         });
@@ -461,7 +461,7 @@ class MockPortalDesktopObject extends DBusObject {
         options.removeWhere((key, value) => key == 'handle_token');
         var dialog = MockDialog(parentWindow, title, options);
         server.saveFileDialogs.add(dialog);
-        var request = await server.addRequest(methodCall.sender, token,
+        var request = await server.addRequest(methodCall.sender!, token,
             onClosed: () async {
           server.saveFileDialogs.remove(dialog);
         });
@@ -482,7 +482,7 @@ class MockPortalDesktopObject extends DBusObject {
         options.removeWhere((key, value) => key == 'handle_token');
         var dialog = MockDialog(parentWindow, title, options);
         server.saveFilesDialogs.add(dialog);
-        var request = await server.addRequest(methodCall.sender, token,
+        var request = await server.addRequest(methodCall.sender!, token,
             onClosed: () async {
           server.saveFilesDialogs.remove(dialog);
         });
@@ -524,7 +524,7 @@ class MockPortalDesktopObject extends DBusObject {
         var options = methodCall.values[2].asStringVariantDict();
         var token =
             options['handle_token']?.asString() ?? server.generateToken();
-        var request = await server.addRequest(methodCall.sender, token);
+        var request = await server.addRequest(methodCall.sender!, token);
         Future.delayed(Duration.zero, () async {
           await request.respond();
           for (var location in server.locations) {
@@ -599,7 +599,7 @@ class MockPortalDesktopObject extends DBusObject {
             options['handle_token']?.asString() ?? server.generateToken();
         options.removeWhere((key, value) => key == 'handle_token');
         server.openedUris.add(MockUri(parentWindow, uri, options));
-        var request = await server.addRequest(methodCall.sender, token);
+        var request = await server.addRequest(methodCall.sender!, token);
         Future.delayed(Duration.zero, () async => await request.respond());
         return DBusMethodSuccessResponse([request.path]);
       default:
@@ -661,7 +661,7 @@ class MockPortalDesktopObject extends DBusObject {
         var token =
             options['handle_token']?.asString() ?? server.generateToken();
         options.removeWhere((key, value) => key == 'handle_token');
-        var request = await server.addRequest(methodCall.sender, token);
+        var request = await server.addRequest(methodCall.sender!, token);
         Future.delayed(Duration.zero, () async => await request.respond());
         return DBusMethodSuccessResponse([request.path]);
       default:
