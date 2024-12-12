@@ -8,7 +8,7 @@ description:
 homepage: https://github.com/canonical/xdg_desktop_portal.dart
 
 environment:
-  sdk: '>=2.15.0 <3.0.0'
+  sdk: '>=2.15.0 <4.0.0'
 
 platforms:
   linux:
