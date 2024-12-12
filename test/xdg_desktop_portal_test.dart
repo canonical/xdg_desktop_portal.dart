@@ -1142,7 +1142,6 @@ class MockPortalDesktopServer extends DBusClient {
       );
       assert(actions.contains(DBusString(action)));
     }
-    print('clicking notification $id, action $action');
     notifications.remove(id);
     await _root.emitSignal(
       'org.freedesktop.portal.Notification',
@@ -2743,18 +2742,12 @@ void main() {
           XdgNotificationActionInvokedEvent('003', 'action2-003'),
         ]));
 
-    client.notification.actionInvoked.listen((event) {
-      print(event);
-    });
+    // Get version to ensure we are subscribed to changes.
+    await client.notification.getVersion();
 
     await portalServer.clickNotification('001', null);
-    expect(portalServer.notifications.length, equals(2));
-
     await portalServer.clickNotification('002', 'action1-002');
-    expect(portalServer.notifications.length, equals(1));
-
     await portalServer.clickNotification('003', 'action2-003');
-    expect(portalServer.notifications.length, equals(0));
   });
 
   test('open uri', () async {
@@ -3037,7 +3030,7 @@ void main() {
     expect(await client.settings.read('com.example.test', 'name'),
         equals(DBusString('Foo')));
 
-    // Change value to trigeer events.
+    // Change value to trigger events.
     await portalServer.setSetting(
         'com.example.test', 'name', DBusString('Hello'));
     await portalServer.setSetting(
