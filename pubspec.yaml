@@ -1,5 +1,5 @@
 name: xdg_desktop_portal
-version: 0.1.12
+version: 0.1.13
 
 description:
   A native Dart implementation of portals. This package

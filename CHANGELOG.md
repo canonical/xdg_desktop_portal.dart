@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.13
+
+* Add trash portal
+* Add ActionInvoked signal to notification portal.
+
 ## 0.1.12
 
 * Add XdgSettingsPortal.settingChanged stream.
