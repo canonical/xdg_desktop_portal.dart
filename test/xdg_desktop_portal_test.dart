@@ -1127,26 +1127,13 @@ class MockPortalDesktopServer extends DBusClient {
 
   /// Emulate clicking a notification.
   ///
-  /// [action] is the action to invoke, or null to invoke the default action.
-  Future<void> clickNotification(String id, String? action) async {
-    var notification = notifications[id]!;
-    if (action == null) {
-      action = notification['default-action']!.asString();
-    } else {
-      final List<Map<DBusValue, DBusValue>> buttons = notification['buttons']!
-          .asArray()
-          .map((e) => (e as DBusDict).asDict())
-          .toList();
-      final actions = buttons.map(
-        (e) => (e)[DBusString('action')]!.asVariant(),
-      );
-      assert(actions.contains(DBusString(action)));
-    }
-    notifications.remove(id);
+  /// [action] is the action to invoke.
+  Future<void> clickNotification(String id, String action,
+      {List<DBusValue> parameter = const []}) async {
     await _root.emitSignal(
       'org.freedesktop.portal.Notification',
       'ActionInvoked',
-      [DBusString(id), DBusString(action), DBusArray.variant([])],
+      [DBusString(id), DBusString(action), DBusArray.variant(parameter)],
     );
   }
 
@@ -2674,54 +2661,8 @@ void main() {
     var portalServer = MockPortalDesktopServer(
       clientAddress,
       notifications: {
-        '001': {
-          'title': DBusString('Title'),
-          'body': DBusString('Lorem Ipsum'),
-          'priority': DBusString('high'),
-          'default-action': DBusString('defaultAction-001'),
-          'buttons': DBusArray(DBusSignature('a{sv}'), [
-            DBusDict.stringVariant({
-              'label': DBusString('Button 1'),
-              'action': DBusString('action1-001')
-            }),
-            DBusDict.stringVariant({
-              'label': DBusString('Button 2'),
-              'action': DBusString('action2-001')
-            })
-          ])
-        },
-        '002': {
-          'title': DBusString('Title'),
-          'body': DBusString('Lorem Ipsum'),
-          'priority': DBusString('high'),
-          'default-action': DBusString('defaultAction-002'),
-          'buttons': DBusArray(DBusSignature('a{sv}'), [
-            DBusDict.stringVariant({
-              'label': DBusString('Button 1'),
-              'action': DBusString('action1-002')
-            }),
-            DBusDict.stringVariant({
-              'label': DBusString('Button 2'),
-              'action': DBusString('action2-002')
-            })
-          ])
-        },
-        '003': {
-          'title': DBusString('Title'),
-          'body': DBusString('Lorem Ipsum'),
-          'priority': DBusString('high'),
-          'default-action': DBusString('defaultAction-003'),
-          'buttons': DBusArray(DBusSignature('a{sv}'), [
-            DBusDict.stringVariant({
-              'label': DBusString('Button 1'),
-              'action': DBusString('action1-003')
-            }),
-            DBusDict.stringVariant({
-              'label': DBusString('Button 2'),
-              'action': DBusString('action2-003')
-            })
-          ])
-        },
+        '001': {},
+        '002': {},
       },
     );
     await portalServer.start();
@@ -2737,17 +2678,25 @@ void main() {
     expect(
         client.notification.actionInvoked,
         emitsInOrder([
-          XdgNotificationActionInvokedEvent('001', 'defaultAction-001'),
-          XdgNotificationActionInvokedEvent('002', 'action1-002'),
-          XdgNotificationActionInvokedEvent('003', 'action2-003'),
+          XdgNotificationActionInvokedEvent('001', 'action1-001', []),
+          XdgNotificationActionInvokedEvent('002', 'action2-002', [
+            DBusString('TARGET'),
+            DBusDict.stringVariant(
+                {'activation-token': DBusString('ACTIVATION-TOKEN')}),
+            DBusString('RESPONSE')
+          ]),
         ]));
 
     // Get version to ensure we are subscribed to changes.
     await client.notification.getVersion();
 
-    await portalServer.clickNotification('001', null);
-    await portalServer.clickNotification('002', 'action1-002');
-    await portalServer.clickNotification('003', 'action2-003');
+    await portalServer.clickNotification('001', 'action1-001');
+    await portalServer.clickNotification('002', 'action2-002', parameter: [
+      DBusString('TARGET'),
+      DBusDict.stringVariant(
+          {'activation-token': DBusString('ACTIVATION-TOKEN')}),
+      DBusString('RESPONSE')
+    ]);
   });
 
   test('open uri', () async {

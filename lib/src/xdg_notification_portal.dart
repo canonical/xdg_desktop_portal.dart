@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import 'package:collection/collection.dart';
 import 'package:dbus/dbus.dart';
 
 /// Priorities for notifications.
@@ -59,19 +60,29 @@ class XdgNotificationActionInvokedEvent {
   /// Name of the action that was invoked.
   final String action;
 
-  const XdgNotificationActionInvokedEvent(this.id, this.action);
+  /// Additional information.
+  final List<DBusValue> parameter;
+
+  XdgNotificationActionInvokedEvent(
+      this.id, this.action, Iterable<DBusValue> parameter)
+      : parameter = parameter.toList();
 
   @override
-  int get hashCode => Object.hash(id, action);
+  int get hashCode => Object.hash(id, action, Object.hashAll(parameter));
 
   @override
-  bool operator ==(other) =>
-      other is XdgNotificationActionInvokedEvent &&
-      other.id == id &&
-      other.action == action;
+  bool operator ==(other) {
+    if (identical(this, other)) return true;
+    final listEquals = const DeepCollectionEquality().equals;
+
+    return other is XdgNotificationActionInvokedEvent &&
+        other.id == id &&
+        other.action == action &&
+        listEquals(other.parameter, parameter);
+  }
 
   @override
-  String toString() => '$runtimeType($id, $action)';
+  String toString() => '$runtimeType($id, $action, $parameter)';
 }
 
 /// Portal to create notifications.
@@ -164,6 +175,7 @@ class XdgNotificationPortal {
       ).map((DBusSignal signal) {
         final id = signal.values[0].asString();
         final action = signal.values[1].asString();
-        return XdgNotificationActionInvokedEvent(id, action);
+        final parameter = signal.values[2].asVariantArray();
+        return XdgNotificationActionInvokedEvent(id, action, parameter);
       });
 }
