@@ -16,6 +16,7 @@ export 'src/xdg_print_portal.dart';
 export 'src/xdg_proxy_resolver_portal.dart';
 export 'src/xdg_remote_desktop_portal.dart';
 export 'src/xdg_screen_cast_portal.dart';
+export 'src/xdg_screenshot_portal.dart';
 export 'src/xdg_secret_portal.dart';
 export 'src/xdg_settings_portal.dart';
 export 'src/xdg_trash_portal.dart';

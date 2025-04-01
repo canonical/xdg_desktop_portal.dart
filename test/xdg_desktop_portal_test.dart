@@ -225,6 +225,58 @@ class MockLocationSession {
   String toString() => '$runtimeType($parentWindow, $options)';
 }
 
+class MockScreenshot {
+  final String parentWindow;
+  final Map<String, DBusValue> options;
+
+  MockScreenshot(this.parentWindow, this.options);
+
+  @override
+  int get hashCode => Object.hash(
+      parentWindow,
+      Object.hashAll(
+          options.entries.map((entry) => Object.hash(entry.key, entry.value))));
+
+  @override
+  bool operator ==(other) {
+    if (identical(this, other)) return true;
+    final mapEquals = const DeepCollectionEquality().equals;
+
+    return other is MockScreenshot &&
+        other.parentWindow == parentWindow &&
+        mapEquals(other.options, options);
+  }
+
+  @override
+  String toString() => '$runtimeType($parentWindow, $options)';
+}
+
+class MockColorPick {
+  final String parentWindow;
+  final Map<String, DBusValue> options;
+
+  MockColorPick(this.parentWindow, this.options);
+
+  @override
+  int get hashCode => Object.hash(
+      parentWindow,
+      Object.hashAll(
+          options.entries.map((entry) => Object.hash(entry.key, entry.value))));
+
+  @override
+  bool operator ==(other) {
+    if (identical(this, other)) return true;
+    final mapEquals = const DeepCollectionEquality().equals;
+
+    return other is MockColorPick &&
+        other.parentWindow == parentWindow &&
+        mapEquals(other.options, options);
+  }
+
+  @override
+  String toString() => '$runtimeType($parentWindow, $options)';
+}
+
 class MockPortalRequestObject extends DBusObject {
   final MockPortalDesktopServer server;
   Future<void> Function()? onClosed;
@@ -320,6 +372,8 @@ class MockPortalDesktopObject extends DBusObject {
         return handleRemoteDesktopMethodCall(methodCall);
       case 'org.freedesktop.portal.ScreenCast':
         return handleScreenCastMethodCall(methodCall);
+      case 'org.freedesktop.portal.Screenshot':
+        return handleScreenshotMethodCall(methodCall);
       case 'org.freedesktop.portal.Secret':
         return handleSecretMethodCall(methodCall);
       case 'org.freedesktop.portal.Settings':
@@ -651,6 +705,45 @@ class MockPortalDesktopObject extends DBusObject {
     }
   }
 
+  Future<DBusMethodResponse> handleScreenshotMethodCall(
+      DBusMethodCall methodCall) async {
+    switch (methodCall.name) {
+      case 'Screenshot':
+        var parentWindow = methodCall.values[0].asString();
+        var options = methodCall.values[1].asStringVariantDict();
+        var token =
+            options['handle_token']?.asString() ?? server.generateToken();
+        options.removeWhere((key, value) => key == 'handle_token');
+        server.screenshots.add(MockScreenshot(parentWindow, options));
+        var request = await server.addRequest(methodCall.sender!, token);
+        Future.delayed(
+            Duration.zero,
+            () async => await request.respond(result: {
+                  'uri':
+                      DBusString(
+                      'file:///home/user/Pictures/Screenshot-${server.screenshots.length}.png'),
+                }));
+        return DBusMethodSuccessResponse([request.path]);
+      case 'PickColor':
+        var parentWindow = methodCall.values[0].asString();
+        var options = methodCall.values[1].asStringVariantDict();
+        var token =
+            options['handle_token']?.asString() ?? server.generateToken();
+        options.removeWhere((key, value) => key == 'handle_token');
+        server.colorPicks.add(MockColorPick(parentWindow, options));
+        var request = await server.addRequest(methodCall.sender!, token);
+        Future.delayed(
+            Duration.zero,
+            () async => await request.respond(result: {
+                  'color': DBusStruct(
+                      [DBusDouble(0.1), DBusDouble(0.2), DBusDouble(0.3)]),
+                }));
+        return DBusMethodSuccessResponse([request.path]);
+      default:
+        return DBusMethodErrorResponse.unknownMethod();
+    }
+  }
+
   Future<DBusMethodResponse> handleSecretMethodCall(
       DBusMethodCall methodCall) async {
     switch (methodCall.name) {
@@ -756,6 +849,8 @@ class MockPortalDesktopObject extends DBusObject {
         return getRemoteDesktopProperty(name);
       case 'org.freedesktop.portal.ScreenCast':
         return getScreenCastProperty(name);
+      case 'org.freedesktop.portal.Screenshot':
+        return getScreenshotProperty(name);
       case 'org.freedesktop.portal.Secret':
         return getSecretProperty(name);
       case 'org.freedesktop.portal.Settings':
@@ -899,6 +994,15 @@ class MockPortalDesktopObject extends DBusObject {
     switch (name) {
       case 'version':
         return DBusGetPropertyResponse(DBusUint32(4));
+      default:
+        return DBusMethodErrorResponse.unknownProperty();
+    }
+  }
+
+  Future<DBusMethodResponse> getScreenshotProperty(String name) async {
+    switch (name) {
+      case 'version':
+        return DBusGetPropertyResponse(DBusUint32(2));
       default:
         return DBusMethodErrorResponse.unknownProperty();
     }
@@ -1096,6 +1200,8 @@ class MockPortalDesktopServer extends DBusClient {
   Iterable<MockLocationSession> get locationSessions =>
       _locationSessions.values;
   final _locationSessions = <DBusObjectPath, MockLocationSession>{};
+  final screenshots = <MockScreenshot>[];
+  final colorPicks = <MockColorPick>[];
 
   MockPortalDesktopServer(DBusAddress clientAddress,
       {this.userId,
@@ -2900,6 +3006,48 @@ void main() {
     });
 
     expect(await client.screenCast.getVersion(), equals(4));
+  });
+
+  test('screenshot', () async {
+    var server = DBusServer();
+    var clientAddress =
+        await server.listenAddress(DBusAddress.unix(dir: Directory.systemTemp));
+    addTearDown(() async {
+      await server.close();
+    });
+
+    var portalServer = MockPortalDesktopServer(clientAddress);
+    await portalServer.start();
+    addTearDown(() async {
+      await portalServer.close();
+    });
+
+    var client = XdgDesktopPortalClient(bus: DBusClient(clientAddress));
+    addTearDown(() async {
+      await client.close();
+    });
+
+    expect(await client.screenshot.getVersion(), equals(2));
+
+    expect(await client.screenshot.screenshot(parentWindow: 'x11:12345'),
+        equals(Uri.file('/home/user/Pictures/Screenshot-1.png')));
+    expect(portalServer.screenshots, equals([MockScreenshot('x11:12345', {})]));
+
+    expect(
+        await client.screenshot.screenshot(
+            parentWindow: 'x11:67890', interactive: true, modal: false),
+        equals(Uri.file('/home/user/Pictures/Screenshot-2.png')));
+    expect(
+        portalServer.screenshots,
+        equals([
+          MockScreenshot('x11:12345', {}),
+          MockScreenshot('x11:67890',
+              {'interactive': DBusBoolean(true), 'modal': DBusBoolean(false)})
+        ]));
+
+    expect(await client.screenshot.pickColor(parentWindow: 'x11:12345'),
+        equals(<double>[0.1, 0.2, 0.3]));
+    expect(portalServer.colorPicks, equals([MockColorPick('x11:12345', {})]));
   });
 
   test('secret', () async {
