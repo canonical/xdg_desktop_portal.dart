@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.14
+
+* Add getHostPaths() to Documents portal.
+
 ## 0.1.13
 
 * Add trash portal

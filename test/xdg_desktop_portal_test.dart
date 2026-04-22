@@ -1009,6 +1009,16 @@ class MockPortalDocumentsObject extends DBusObject {
         var docId = methodCall.values[0].asString();
         server.documents.remove(docId);
         return DBusMethodSuccessResponse();
+      case 'GetHostPaths':
+        var docIds = methodCall.values[0].asStringArray();
+        return DBusMethodSuccessResponse([
+          DBusDict(DBusSignature('s'), DBusSignature('ay'), {
+            for (var id in docIds)
+              if (server.documents.containsKey(id))
+                DBusString(id):
+                    DBusArray.byte([...server.documents[id]!.path, 0])
+          })
+        ]);
       default:
         return DBusMethodErrorResponse.unknownMethod();
     }
@@ -1568,6 +1578,39 @@ void main() {
         equals({
           '123457': MockDocument(
               Uint8List.fromList(utf8.encode('/home/example/README.md')))
+        }));
+  });
+
+  test('documents - host paths', () async {
+    var server = DBusServer();
+    var clientAddress =
+        await server.listenAddress(DBusAddress.unix(dir: Directory.systemTemp));
+    addTearDown(() async {
+      await server.close();
+    });
+
+    var portalServer = MockPortalDocumentsServer(clientAddress, documents: {
+      '123456': MockDocument(
+          Uint8List.fromList(utf8.encode('/home/example/image.png'))),
+      '123457': MockDocument(
+          Uint8List.fromList(utf8.encode('/home/example/README.md')))
+    });
+    await portalServer.start();
+    addTearDown(() async {
+      await portalServer.close();
+    });
+
+    var client = XdgDesktopPortalClient(bus: DBusClient(clientAddress));
+    addTearDown(() async {
+      await client.close();
+    });
+
+    var paths = await client.documents.getHostPaths(['123456', '123457']);
+    expect(
+        paths.map((id, file) => MapEntry(id, file.path)),
+        equals({
+          '123456': '/home/example/image.png',
+          '123457': '/home/example/README.md',
         }));
   });
 
