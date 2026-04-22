@@ -20,6 +20,7 @@ import 'xdg_print_portal.dart';
 import 'xdg_proxy_resolver_portal.dart';
 import 'xdg_remote_desktop_portal.dart';
 import 'xdg_screen_cast_portal.dart';
+import 'xdg_screenshot_portal.dart';
 import 'xdg_secret_portal.dart';
 import 'xdg_settings_portal.dart';
 import 'xdg_trash_portal.dart';
@@ -85,6 +86,9 @@ class XdgDesktopPortalClient {
   /// Portal to perform screen casts.
   late final XdgScreenCastPortal screenCast;
 
+  /// Portal for taking screenshots.
+  late final XdgScreenshotPortal screenshot;
+
   /// Portal for retrieving application secret.
   late final XdgSecretPortal secret;
 
@@ -127,6 +131,7 @@ class XdgDesktopPortalClient {
     proxyResolver = XdgProxyResolverPortal(_desktopObject);
     remoteDesktop = XdgRemoteDesktopPortal(_desktopObject);
     screenCast = XdgScreenCastPortal(_desktopObject);
+    screenshot = XdgScreenshotPortal(_desktopObject, _generateToken);
     secret = XdgSecretPortal(_desktopObject, _generateToken);
     settings = XdgSettingsPortal(_desktopObject);
     trash = XdgTrashPortal(_desktopObject);
