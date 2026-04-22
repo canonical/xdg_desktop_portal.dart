@@ -110,4 +110,14 @@ class XdgDocumentsPortal {
         'org.freedesktop.portal.Documents', 'Delete', [DBusString(docId)],
         replySignature: DBusSignature(''));
   }
+
+  /// Returns the host filesystem paths for the given document [docIds].
+  Future<Map<String, File>> getHostPaths(Iterable<String> docIds) async {
+    var result = await _object.callMethod('org.freedesktop.portal.Documents',
+        'GetHostPaths', [DBusArray.string(docIds)],
+        replySignature: DBusSignature('a{say}'));
+    return result.returnValues[0].asDict().map((key, value) => MapEntry(
+        key.asString(),
+        File.fromRawPath(Uint8List.fromList(value.asByteArray().toList()))));
+  }
 }
