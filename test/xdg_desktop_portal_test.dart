@@ -143,7 +143,7 @@ class MockEmail {
 
 class MockUri {
   final String parentWindow;
-  final String uri;
+  final Uri uri;
   final Map<String, DBusValue> options;
 
   MockUri(this.parentWindow, this.uri, this.options);
@@ -593,7 +593,7 @@ class MockPortalDesktopObject extends DBusObject {
     switch (methodCall.name) {
       case 'OpenURI':
         var parentWindow = methodCall.values[0].asString();
-        var uri = methodCall.values[1].asString();
+        var uri = Uri.parse(methodCall.values[1].asString());
         var options = methodCall.values[2].asStringVariantDict();
         var token =
             options['handle_token']?.asString() ?? server.generateToken();
@@ -1266,7 +1266,7 @@ void main() {
       clientAddress,
       userId: 'alice',
       userName: 'alice',
-      userImage: 'file://home/me/image.png',
+      userImage: 'file:///home/me/image.png',
     );
     await portalServer.start();
     addTearDown(() async {
@@ -1300,20 +1300,20 @@ void main() {
         XdgAccountUserInformation(
           id: 'alice',
           name: 'alice',
-          image: 'file://home/me/image.png',
+          image: Uri.file('/home/me/image.png'),
         ),
       ),
     );
     expect(
         userInformation.toString(),
         equals(
-            'XdgAccountUserInformation(id: alice, name: alice, image: file://home/me/image.png)'));
+            'XdgAccountUserInformation(id: alice, name: alice, image: file:///home/me/image.png)'));
     expect(
         userInformation.hashCode,
         equals(XdgAccountUserInformation(
           id: 'alice',
           name: 'alice',
-          image: 'file://home/me/image.png',
+          image: Uri.file('/home/me/image.png'),
         ).hashCode));
   });
 
@@ -1685,7 +1685,8 @@ void main() {
     var result = await client.fileChooser.openFile(title: 'Open File').first;
     expect(portalServer.openFileDialogs,
         equals([MockDialog('', 'Open File', {})]));
-    expect(result.uris, equals(['file://home/me/image.png']));
+    expect(result.uris.map((u) => u.toString()).toList(),
+        equals(['file://home/me/image.png']));
     expect(result.choices, isEmpty);
     expect(result.currentFilter, isNull);
   });
@@ -1783,7 +1784,8 @@ void main() {
             ])
           })
         ]));
-    expect(result.uris, equals(['file://home/me/image.png']));
+    expect(result.uris.map((u) => u.toString()).toList(),
+        equals(['file://home/me/image.png']));
     expect(result.choices, equals({'color': 'green'}));
     expect(
         result.currentFilter,
@@ -1829,7 +1831,8 @@ void main() {
     var result = await client.fileChooser.saveFile(title: 'Save File').first;
     expect(portalServer.saveFileDialogs,
         equals([MockDialog('', 'Save File', {})]));
-    expect(result.uris, equals(['file://home/me/image.png']));
+    expect(result.uris.map((u) => u.toString()).toList(),
+        equals(['file://home/me/image.png']));
     expect(result.choices, isEmpty);
     expect(result.currentFilter, isNull);
   });
@@ -1931,7 +1934,8 @@ void main() {
                 DBusArray.byte(utf8.encode('/usr/share/icons/dart.png')),
           })
         ]));
-    expect(result.uris, equals(['file://home/me/image.png']));
+    expect(result.uris.map((u) => u.toString()).toList(),
+        equals(['file://home/me/image.png']));
     expect(result.choices, equals({'color': 'green'}));
     expect(
         result.currentFilter,
@@ -1966,7 +1970,8 @@ void main() {
     var result = await client.fileChooser.saveFiles(title: 'Save Files').first;
     expect(portalServer.saveFilesDialogs,
         equals([MockDialog('', 'Save Files', {})]));
-    expect(result.uris, equals(['file://home/me/image.png']));
+    expect(result.uris.map((u) => u.toString()).toList(),
+        equals(['file://home/me/image.png']));
     expect(result.choices, isEmpty);
   });
 
@@ -2039,7 +2044,8 @@ void main() {
             ])
           })
         ]));
-    expect(result.uris, equals(['file://home/me/image.png']));
+    expect(result.uris.map((u) => u.toString()).toList(),
+        equals(['file://home/me/image.png']));
     expect(result.choices, equals({'color': 'green'}));
   });
 
@@ -2597,7 +2603,7 @@ void main() {
 
     await client.notification.addNotification('123',
         title: 'Title',
-        icon: XdgNotificationIconUri('https://example.com/icon.png'));
+        icon: XdgNotificationIconUri(Uri.https('example.com', '/icon.png')));
     expect(
         portalServer.notifications,
         equals({
@@ -2814,7 +2820,7 @@ void main() {
 
     expect(await client.openUri.getVersion(), equals(3));
 
-    await client.openUri.openUri('http://example.com',
+    await client.openUri.openUri(Uri.http('example.com'),
         parentWindow: 'x11:12345',
         writable: true,
         ask: true,
@@ -2822,7 +2828,7 @@ void main() {
     expect(
         portalServer.openedUris,
         equals([
-          MockUri('x11:12345', 'http://example.com', {
+          MockUri('x11:12345', Uri.http('example.com'), {
             'writable': DBusBoolean(true),
             'ask': DBusBoolean(true),
             'activation_token': DBusString('token')
