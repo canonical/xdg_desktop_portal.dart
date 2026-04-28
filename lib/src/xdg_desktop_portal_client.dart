@@ -125,7 +125,7 @@ class XdgDesktopPortalClient {
     powerProfileMonitor = XdgPowerProfileMonitorPortal(_desktopObject);
     print = XdgPrintPortal(_desktopObject);
     proxyResolver = XdgProxyResolverPortal(_desktopObject);
-    remoteDesktop = XdgRemoteDesktopPortal(_desktopObject);
+    remoteDesktop = XdgRemoteDesktopPortal(_desktopObject, _generateToken);
     screenCast = XdgScreenCastPortal(_desktopObject);
     secret = XdgSecretPortal(_desktopObject, _generateToken);
     settings = XdgSettingsPortal(_desktopObject);
