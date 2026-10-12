@@ -8,14 +8,14 @@ description:
 homepage: https://github.com/canonical/xdg_desktop_portal.dart
 
 environment:
-  sdk: '>=2.15.0 <4.0.0'
+  sdk: '>=3.0.0 <4.0.0'
 
 platforms:
   linux:
 
 dependencies:
   collection: ^1.15.0
-  dbus: ^0.7.9
+  dbus: ^0.8.0
 
 dev_dependencies:
   lints: ^2.0.0
