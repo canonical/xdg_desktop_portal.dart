@@ -257,6 +257,7 @@ class XdgFileChooserPortal {
       bool? directory,
       Iterable<XdgFileChooserFilter> filters = const [],
       XdgFileChooserFilter? currentFilter,
+      Uint8List? currentFolder,
       Iterable<XdgFileChooserChoice> choices = const []}) {
     var request = XdgPortalRequest(_object, () async {
       var options = <String, DBusValue>{};
@@ -278,6 +279,9 @@ class XdgFileChooserPortal {
       }
       if (currentFilter != null) {
         options['current_filter'] = _encodeFilter(currentFilter);
+      }
+      if (currentFolder != null) {
+        options['current_folder'] = DBusArray.byte(currentFolder);
       }
       if (choices.isNotEmpty) {
         options['choices'] = _encodeChoices(choices);
