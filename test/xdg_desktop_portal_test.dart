@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:ffi';
 import 'dart:math';
 import 'dart:io';
 import 'dart:typed_data';
@@ -1253,6 +1254,33 @@ class MockPortalDocumentsServer extends DBusClient {
   }
 }
 
+class MockXdgPortal implements XdgPortal {
+  bool _mockReturnValue = false;
+  @override
+  // FIX ME: This is not necessary at all..
+  DynamicLibrary get libPortalLib => DynamicLibrary.open('libportal.so.1');
+
+  /// Allows setting a custom return value for `runningUnderSnap()`
+  void setMockReturnValue(bool value) {
+    _mockReturnValue = value;
+  }
+
+  @override
+  bool runningUnderSnap() {
+    return _mockReturnValue;
+  }
+
+  @override
+  bool runningUnderSandbox() {
+    return _mockReturnValue;
+  }
+
+  @override
+  bool runningUnderFlatpak() {
+    return _mockReturnValue;
+  }
+}
+
 void main() {
   test('account', () async {
     var server = DBusServer();
@@ -1425,6 +1453,14 @@ void main() {
 
     var result = await client.camera.openPipeWireRemote();
     expect(result, isNotNull);
+  });
+
+  test('client - test', () {
+    var client = MockXdgPortal();
+    client.setMockReturnValue(false);
+    expect(client.runningUnderSnap(), isFalse);
+    expect(client.runningUnderSandbox(), isFalse);
+    expect(client.runningUnderFlatpak(), isFalse);
   });
 
   test('documents - mount point', () async {

@@ -10,6 +10,7 @@ export 'src/xdg_memory_monitor_portal.dart';
 export 'src/xdg_network_monitor_portal.dart';
 export 'src/xdg_notification_portal.dart';
 export 'src/xdg_open_uri_portal.dart';
+export 'src/xdg_portal.dart';
 export 'src/xdg_portal_request_exception.dart';
 export 'src/xdg_power_profile_monitor_portal.dart';
 export 'src/xdg_print_portal.dart';
