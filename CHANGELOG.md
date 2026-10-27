@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.15
+
+* Update dbus to 0.8.0.
+* Require Dart 3.0.
+
 ## 0.1.14
 
 * Add getHostPaths() to Documents portal.
