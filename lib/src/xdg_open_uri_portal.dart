@@ -16,7 +16,7 @@ class XdgOpenUriPortal {
       .then((v) => v.asUint32());
 
   /// Ask to open a URI.
-  Future<void> openUri(String uri,
+  Future<void> openUri(Uri uri,
       {String parentWindow = '',
       bool? writable,
       bool? ask,
@@ -38,7 +38,7 @@ class XdgOpenUriPortal {
           'OpenURI',
           [
             DBusString(parentWindow),
-            DBusString(uri),
+            DBusString(uri.toString()),
             DBusDict.stringVariant(options)
           ],
           replySignature: DBusSignature('o'));

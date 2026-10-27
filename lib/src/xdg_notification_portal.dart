@@ -19,7 +19,7 @@ class XdgNotificationIconFile extends XdgNotificationIcon {
 /// An icon at a URI.
 class XdgNotificationIconUri extends XdgNotificationIcon {
   /// Uri of this icon
-  final String uri;
+  final Uri uri;
 
   XdgNotificationIconUri(this.uri);
 }
@@ -108,8 +108,8 @@ class XdgNotificationPortal {
         notification['icon'] = DBusStruct(
             [DBusString('file'), DBusVariant(DBusString(icon.path))]);
       } else if (icon is XdgNotificationIconUri) {
-        notification['icon'] =
-            DBusStruct([DBusString('file'), DBusVariant(DBusString(icon.uri))]);
+        notification['icon'] = DBusStruct(
+            [DBusString('file'), DBusVariant(DBusString(icon.uri.toString()))]);
       } else if (icon is XdgNotificationIconThemed) {
         notification['icon'] = DBusStruct(
             [DBusString('themed'), DBusVariant(DBusArray.string(icon.names))]);
