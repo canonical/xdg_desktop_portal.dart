@@ -1,0 +1,12 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "release-type": "dart",
+  "include-component-in-tag": false,
+  "bump-minor-pre-major": true,
+  "bump-patch-for-minor-pre-major": true,
+  "pull-request-title-pattern": "chore: release ${version}",
+  "bootstrap-sha": "8cd5a1420ea86728a7c0495bd3a691569857b184",
+  "packages": {
+    ".": {}
+  }
+}
