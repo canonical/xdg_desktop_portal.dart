@@ -191,7 +191,7 @@ Map<String, String> _decodeChoicesResult(DBusValue? value) {
 /// Result of a request for access to files.
 class XdgFileChooserPortalOpenFileResult {
   /// The URIs selected in the file chooser.
-  final List<String> uris;
+  final List<Uri> uris;
 
   /// Result of the choices taken in the chooser.
   final Map<String, String> choices;
@@ -208,7 +208,7 @@ class XdgFileChooserPortalOpenFileResult {
 /// Result of a request asking for a location to save a file.
 class XdgFileChooserPortalSaveFileResult {
   /// The URIs selected in the file chooser.
-  final List<String> uris;
+  final List<Uri> uris;
 
   /// Result of the choices taken in the chooser.
   final Map<String, String> choices;
@@ -225,7 +225,7 @@ class XdgFileChooserPortalSaveFileResult {
 /// Result of a request asking for a folder as a location to save one or more files.
 class XdgFileChooserPortalSaveFilesResult {
   /// The URIs selected in the file chooser.
-  final List<String> uris;
+  final List<Uri> uris;
 
   /// Result of the choices taken in the chooser.
   final Map<String, String> choices;
@@ -296,8 +296,8 @@ class XdgFileChooserPortal {
     return request.stream.map((result) {
       var urisValue = result['uris'];
       var uris = urisValue?.signature == DBusSignature('as')
-          ? urisValue!.asStringArray().toList()
-          : <String>[];
+          ? urisValue!.asStringArray().map((Uri.parse)).toList()
+          : <Uri>[];
       var choicesResult = _decodeChoicesResult(result['choices']);
       var selectedFilter = _decodeFilter(result['current_filter']);
 
@@ -359,8 +359,8 @@ class XdgFileChooserPortal {
     return request.stream.map((result) {
       var urisValue = result['uris'];
       var uris = urisValue?.signature == DBusSignature('as')
-          ? urisValue!.asStringArray().toList()
-          : <String>[];
+          ? urisValue!.asStringArray().map((Uri.parse)).toList()
+          : <Uri>[];
       var choicesResult = _decodeChoicesResult(result['choices']);
       var selectedFilter = _decodeFilter(result['current_filter']);
 
@@ -411,8 +411,8 @@ class XdgFileChooserPortal {
     return request.stream.map((result) {
       var urisValue = result['uris'];
       var uris = urisValue?.signature == DBusSignature('as')
-          ? urisValue!.asStringArray().toList()
-          : <String>[];
+          ? urisValue!.asStringArray().map((Uri.parse)).toList()
+          : <Uri>[];
       var choicesResult = _decodeChoicesResult(result['choices']);
 
       return XdgFileChooserPortalSaveFilesResult(

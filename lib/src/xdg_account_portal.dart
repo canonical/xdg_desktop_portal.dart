@@ -11,7 +11,7 @@ class XdgAccountUserInformation {
   final String name;
 
   /// The URI of an image file for the users avatar photo.
-  final String image;
+  final Uri image;
 
   XdgAccountUserInformation(
       {required this.id, required this.name, required this.image});
@@ -66,7 +66,7 @@ class XdgAccountPortal {
       (result) => XdgAccountUserInformation(
         id: result['id']?.asString() ?? '',
         name: result['name']?.asString() ?? '',
-        image: result['image']?.asString() ?? '',
+        image: Uri.parse(result['image']?.asString() ?? ''),
       ),
     );
   }
